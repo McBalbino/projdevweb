@@ -1,33 +1,31 @@
+// src/models/Admin.ts
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-
-// Defina os atributos do modelo
-interface UserAttributes {
+interface AdminAttributes {
   id: number;
-  name: string;
+  nome: string;
   email: string;
-  password: string;
+  senha: string;
 }
 
+export interface AdminCreationAttributes extends Optional<AdminAttributes, 'id'> {}
 
-export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+export class Admin extends Model<AdminAttributes, AdminCreationAttributes> implements AdminAttributes {
   public id!: number;
-  public name!: string;
+  public nome!: string;
   public email!: string;
-  public password!: string;
+  public senha!: string;
 }
 
-
-// Inicialize o modelo com os campos no banco
-User.init(
+Admin.init(
   {
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
     },
-    name: {
+    nome: {
       type: DataTypes.STRING,
       allowNull: false,
     },
@@ -36,15 +34,14 @@ User.init(
       allowNull: false,
       unique: true,
     },
-    password: {
+    senha: {
       type: DataTypes.STRING,
       allowNull: false,
     },
   },
   {
     sequelize,
-    tableName: "users", 
+    tableName: 'admins',
     timestamps: false,
   }
 );
-
