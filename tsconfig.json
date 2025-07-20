@@ -1,12 +1,17 @@
 {
-    "compilerOptions": {
-      "target": "es6",
-      "module": "commonjs",
-      "declaration": true,
-      "outDir": "./lib",
-      "strict": true
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,       
+    "baseUrl": "./src",
+    "paths": {
+      "*": ["*"]
     },
-    "include": ["src"],
-    "exclude": ["node_modules", "**/__tests__/*"]
+    "skipLibCheck": true              
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "**/__tests__/*"]
 }
-
