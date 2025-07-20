@@ -69,9 +69,5 @@ A aplicação estará disponível em: `http://localhost:3000`
 - `PUT /animais/:id` — Atualizar animal
 - `DELETE /animais/:id` — Remover animal
 
-### Veterinários
-- `POST /veterinarios` — Criar veterinário
-- `GET /veterinarios` — Listar veterinários
-
 ---
 
