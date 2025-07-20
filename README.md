@@ -1,5 +1,5 @@
 
-# Petshop System
+# Sistema de Petshop para disciplina DevWeb
 
 ## Descrição
 Sistema backend para gerenciamento de Petshop, com cadastro e gerenciamento de Clientes, Animais e Veterinários usando Node.js, TypeScript, Express e Sequelize (Postgres).
