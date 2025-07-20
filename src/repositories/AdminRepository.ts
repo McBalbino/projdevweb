@@ -8,4 +8,17 @@ export class AdminRepository {
   async findAll() {
     return Admin.findAll();
   }
+
+  async findById(id: number) {
+    return Admin.findByPk(id);
+  }
+
+  async update(id: number, data: Partial<Admin>) {
+    return Admin.update(data, { where: { id } });
+  }
+
+  async delete(id: number) {
+    return Admin.destroy({ where: { id } });
+  }
 }
+

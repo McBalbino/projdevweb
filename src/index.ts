@@ -13,14 +13,21 @@ const adminCtrl = new AdminController();
 const clientCtrl = new ClientController();
 const animalCtrl = new AnimalController();
 
-app.post('/admin', adminCtrl.create);
-app.get('/admin', adminCtrl.list);
+app.post('/admin', adminCtrl.create); // Criar admin
+app.get('/admin', adminCtrl.list);    // Listar todos os admins
 
-app.post('/clientes', clientCtrl.create);
-app.get('/clientes', clientCtrl.list);
+app.post('/clientes', clientCtrl.create);       // Criar cliente
+app.get('/clientes', clientCtrl.list);          // Listar todos os clientes
+app.get('/clientes/:id', clientCtrl.show);      // Obter um cliente específico
+app.put('/clientes/:id', clientCtrl.update);    // Atualizar cliente
+app.delete('/clientes/:id', clientCtrl.delete); // Remover cliente
 
-app.post('/animais', animalCtrl.create);
-app.get('/animais', animalCtrl.list);
+app.post('/animais', animalCtrl.create);       // Criar animal
+app.get('/animais', animalCtrl.list);          // Listar todos os animais
+app.get('/animais/:id', animalCtrl.show);      // Obter um animal específico
+app.put('/animais/:id', animalCtrl.update);    // Atualizar animal
+app.delete('/animais/:id', animalCtrl.delete); // Remover animal
+
 
 sequelize.sync().then(() => {
   app.listen(port, () => {

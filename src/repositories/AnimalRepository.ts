@@ -8,4 +8,16 @@ export class AnimalRepository {
   async findAll() {
     return Animal.findAll({ include: { all: true } });
   }
+
+  async findById(id: number) {
+    return Animal.findByPk(id);
+  }
+
+  async update(id: number, data: Partial<Animal>) {
+    return Animal.update(data, { where: { id } });
+  }
+
+  async delete(id: number) {
+    return Animal.destroy({ where: { id } });
+  }
 }
