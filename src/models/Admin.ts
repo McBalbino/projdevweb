@@ -1,4 +1,3 @@
-// src/models/Admin.ts
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
@@ -7,15 +6,17 @@ interface AdminAttributes {
   nome: string;
   email: string;
   senha: string;
+  tipo: string;
 }
 
-export interface AdminCreationAttributes extends Optional<AdminAttributes, 'id'> {}
+export interface AdminCreationAttributes extends Optional<AdminAttributes, 'id' | 'tipo'> {}
 
 export class Admin extends Model<AdminAttributes, AdminCreationAttributes> implements AdminAttributes {
   public id!: number;
   public nome!: string;
   public email!: string;
   public senha!: string;
+  public tipo!: string;
 }
 
 Admin.init(
@@ -37,6 +38,11 @@ Admin.init(
     senha: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    tipo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'admin', 
     },
   },
   {
