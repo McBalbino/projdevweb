@@ -1,31 +1,28 @@
 import { Request, Response } from 'express';
-import { ClientRepository } from '../repositories/ClientRepository';
-
-const repo = new ClientRepository();
+import { Client } from '../models/Client';
 
 export class ClientController {
   async create(req: Request, res: Response) {
-    const client = await repo.create(req.body);
-    res.json(client);
+    const client = await Client.create(req.body);
+    res.status(201).json(client);
   }
-
   async list(req: Request, res: Response) {
-    const clients = await repo.findAll();
+    const clients = await Client.findAll({ include: { all: true } });
     res.json(clients);
   }
-
   async show(req: Request, res: Response) {
-    const client = await repo.findById(Number(req.params.id));
+    const client = await Client.findByPk(Number(req.params.id));
+    if (!client) return res.status(404).json({ erro: 'Cliente não encontrado' });
     res.json(client);
   }
-
   async update(req: Request, res: Response) {
-    await repo.update(Number(req.params.id), req.body);
-    res.json({ message: 'Cliente atualizado com sucesso.' });
+    const client = await Client.findByPk(Number(req.params.id));
+    if (!client) return res.status(404).json({ erro: 'Cliente não encontrado' });
+    await client.update(req.body);
+    res.json(client);
   }
-
   async delete(req: Request, res: Response) {
-    await repo.delete(Number(req.params.id));
-    res.json({ message: 'Cliente removido com sucesso.' });
+    await Client.destroy({ where: { id: Number(req.params.id) } });
+    res.json({ mensagem: 'Cliente removido' });
   }
 }

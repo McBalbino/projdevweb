@@ -1,14 +1,11 @@
-// src/models/Animal.ts
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 import { Client } from './Client';
 
-interface AnimalAttributes {
+export interface AnimalAttributes {
   id: number;
   nome: string;
   especie: string;
-  raca: string;
-  idade: number;
   clienteId: number;
 }
 
@@ -18,43 +15,15 @@ export class Animal extends Model<AnimalAttributes, AnimalCreationAttributes> im
   public id!: number;
   public nome!: string;
   public especie!: string;
-  public raca!: string;
-  public idade!: number;
   public clienteId!: number;
 }
 
 Animal.init(
   {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    nome: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    especie: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    raca: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    idade: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    clienteId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: Client,
-        key: 'id',
-      },
-      onDelete: 'CASCADE',
-    },
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    nome: { type: DataTypes.STRING(120), allowNull: false },
+    especie: { type: DataTypes.STRING(60), allowNull: false },
+    clienteId: { type: DataTypes.INTEGER, allowNull: false },
   },
   {
     sequelize,
@@ -62,3 +31,5 @@ Animal.init(
     timestamps: false,
   }
 );
+
+export default Animal;

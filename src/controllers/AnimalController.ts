@@ -1,31 +1,28 @@
 import { Request, Response } from 'express';
-import { AnimalRepository } from '../repositories/AnimalRepository';
-
-const repo = new AnimalRepository();
+import { Animal } from '../models/Animal';
 
 export class AnimalController {
   async create(req: Request, res: Response) {
-    const animal = await repo.create(req.body);
-    res.json(animal);
+    const a = await Animal.create(req.body);
+    res.status(201).json(a);
   }
-
   async list(req: Request, res: Response) {
-    const animals = await repo.findAll();
-    res.json(animals);
+    const lst = await Animal.findAll();
+    res.json(lst);
   }
-
   async show(req: Request, res: Response) {
-    const animal = await repo.findById(Number(req.params.id));
-    res.json(animal);
+    const a = await Animal.findByPk(Number(req.params.id));
+    if (!a) return res.status(404).json({ erro: 'Animal não encontrado' });
+    res.json(a);
   }
-
   async update(req: Request, res: Response) {
-    await repo.update(Number(req.params.id), req.body);
-    res.json({ message: 'Animal atualizado com sucesso.' });
+    const a = await Animal.findByPk(Number(req.params.id));
+    if (!a) return res.status(404).json({ erro: 'Animal não encontrado' });
+    await a.update(req.body);
+    res.json(a);
   }
-
   async delete(req: Request, res: Response) {
-    await repo.delete(Number(req.params.id));
-    res.json({ message: 'Animal removido com sucesso.' });
+    await Animal.destroy({ where: { id: Number(req.params.id) } });
+    res.json({ mensagem: 'Animal removido' });
   }
 }

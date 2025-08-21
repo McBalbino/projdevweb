@@ -1,7 +1,7 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-interface AdminAttributes {
+export interface AdminAttributes {
   id: number;
   nome: string;
   email: string;
@@ -21,29 +21,11 @@ export class Admin extends Model<AdminAttributes, AdminCreationAttributes> imple
 
 Admin.init(
   {
-    id: {
-      type: DataTypes.INTEGER,
-      autoIncrement: true,
-      primaryKey: true,
-    },
-    nome: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    senha: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    tipo: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: 'admin', 
-    },
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    nome: { type: DataTypes.STRING(120), allowNull: false },
+    email: { type: DataTypes.STRING(120), allowNull: false, unique: true },
+    senha: { type: DataTypes.STRING(200), allowNull: false },
+    tipo: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'admin' },
   },
   {
     sequelize,
@@ -51,3 +33,5 @@ Admin.init(
     timestamps: false,
   }
 );
+
+export default Admin;
