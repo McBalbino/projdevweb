@@ -15,7 +15,6 @@ const nowISO = () => new Date().toISOString()
 let uid = 1
 const nextId = () => uid++
 
-// Seed
 const users: User[] = [
   { id: nextId(), nome: "Admin", email: "admin@petshop.com", senha: "123456", tipo: "admin" },
   { id: nextId(), nome: "Cliente", email: "cliente@petshop.com", senha: "123456", tipo: "cliente", telefone: "(83) 99999-0000" },
@@ -45,7 +44,7 @@ function ok(data:any, status=200){ return [status, data] as const }
 function err(message:string, status=400){ return [status, { message }] as const }
 
 export function enableMock(api: AxiosInstance){
-  const mock = new AxiosMockAdapter(api, { delayResponse: 400 })
+  const mock = new AxiosMockAdapter(api, { delayResponse: 300 })
 
   // AUTH
   mock.onPost('/auth/login').reply(config => {
@@ -63,87 +62,29 @@ export function enableMock(api: AxiosInstance){
     clients.push({ id: nextId(), nome, email, telefone, tipo:'cliente' })
     return ok({ id, nome, email, telefone }, 201)
   })
+  mock.onPost('/auth/registrar-admin').reply(config => {
+    const { nome, email, senha } = parseBody(config.data)
+    if (!nome || !email || !senha) return err('nome, email e senha são obrigatórios', 400)
+    if (users.some(u => u.email === email)) return err('email já cadastrado', 409)
+    const id = nextId()
+    users.push({ id, nome, email, senha, tipo:'admin' })
+    return ok({ id, nome, email }, 201)
+  })
 
   // CLIENTS
   mock.onGet('/clients').reply(() => ok(clients))
-  mock.onPost('/clients').reply(config => {
-    const { nome, email, telefone } = parseBody(config.data)
-    const c: Client = { id: nextId(), nome, email, telefone, tipo:'cliente' }
-    clients.push(c); return ok(c, 201)
-  })
-  mock.onPut(/\/clients\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop())
-    const body = parseBody(config.data)
-    const idx = clients.findIndex(c=>c.id===id)
-    if (idx<0) return err('cliente não encontrado', 404)
-    clients[idx] = { ...clients[idx], ...body }; return ok(clients[idx])
-  })
-  mock.onDelete(/\/clients\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop())
-    const i = clients.findIndex(c=>c.id===id)
-    if (i<0) return err('cliente não encontrado', 404)
-    clients.splice(i,1); return ok({ ok:true })
-  })
 
   // ANIMAIS
   mock.onGet('/animais').reply(()=> ok(animais))
-  mock.onPost('/animais').reply(config => {
-    const { nome, especie, clienteId } = parseBody(config.data)
-    const a: Animal = { id: nextId(), nome, especie, clienteId }
-    animais.push(a); return ok(a, 201)
-  })
-  mock.onPut(/\/animais\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const body = parseBody(config.data)
-    const i = animais.findIndex(a=>a.id===id); if(i<0) return err('animal não encontrado',404)
-    animais[i] = { ...animais[i], ...body }; return ok(animais[i])
-  })
-  mock.onDelete(/\/animais\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const i = animais.findIndex(a=>a.id===id)
-    if(i<0) return err('animal não encontrado',404); animais.splice(i,1); return ok({ok:true})
-  })
 
   // FORNECEDORES
   mock.onGet('/fornecedores').reply(()=> ok(fornecedores))
-  mock.onGet(/\/fornecedores\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const f = fornecedores.find(x=>x.id===id)
-    if(!f) return err('fornecedor não encontrado',404); return ok(f)
-  })
-  mock.onPost('/fornecedores').reply(config => {
-    const { nome, cnpj, email, telefone, endereco } = parseBody(config.data)
-    const f: Fornecedor = { id: nextId(), nome, cnpj, email, telefone, endereco }
-    fornecedores.push(f); return ok(f, 201)
-  })
-  mock.onPut(/\/fornecedores\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const body = parseBody(config.data)
-    const i = fornecedores.findIndex(f=>f.id===id); if(i<0) return err('fornecedor não encontrado',404)
-    fornecedores[i] = { ...fornecedores[i], ...body }; return ok(fornecedores[i])
-  })
-  mock.onDelete(/\/fornecedores\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const i = fornecedores.findIndex(f=>f.id===id)
-    if(i<0) return err('fornecedor não encontrado',404); fornecedores.splice(i,1); return ok({ok:true})
-  })
-
-  // Catálogo do fornecedor
   mock.onGet(/\/fornecedores\/\d+\/produtos$/).reply(config => {
     const id = Number(config.url!.split('/')[2]); const lista = produtosFornecedor.filter(p=>p.fornecedorId===id && p.ativo!==false)
     return ok(lista)
   })
-  mock.onPost(/\/fornecedores\/\d+\/produtos$/).reply(config => {
-    const fornecedorId = Number(config.url!.split('/')[2]); const { nome, sku, preco } = parseBody(config.data)
-    const p: ProdutoFornecedor = { id: nextId(), fornecedorId, nome, sku, preco, ativo:true }
-    produtosFornecedor.push(p); return ok(p, 201)
-  })
-  mock.onPut(/\/produtos-fornecedor\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const body = parseBody(config.data)
-    const i = produtosFornecedor.findIndex(p=>p.id===id); if(i<0) return err('produto fornecedor não encontrado',404)
-    produtosFornecedor[i] = { ...produtosFornecedor[i], ...body }; return ok(produtosFornecedor[i])
-  })
-  mock.onDelete(/\/produtos-fornecedor\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const i = produtosFornecedor.findIndex(p=>p.id===id)
-    if(i<0) return err('produto fornecedor não encontrado',404); produtosFornecedor[i].ativo = false; return ok({ok:true})
-  })
 
-  // PEDIDOS DE COMPRA
+  // PEDIDOS
   mock.onPost('/pedidos-compra').reply(config => {
     const { fornecedorId, itens } = parseBody(config.data) as { fornecedorId:number; itens:{produtoFornecedorId:number; quantidade:number; precoUnitario?:number}[] }
     if (!fornecedorId || !Array.isArray(itens) || itens.length===0) return err('fornecedor e itens são obrigatórios',400)
@@ -161,10 +102,6 @@ export function enableMock(api: AxiosInstance){
     return ok(pedido, 201)
   })
   mock.onGet('/pedidos-compra').reply(()=> ok(pedidos))
-  mock.onGet(/\/pedidos-compra\/\d+$/).reply(config => {
-    const id = Number(config.url!.split('/').pop()); const p = pedidos.find(x=>x.id===id)
-    if(!p) return err('pedido não encontrado',404); return ok(p)
-  })
   mock.onPatch(/\/pedidos-compra\/\d+\/status$/).reply(config => {
     const id = Number(config.url!.split('/')[2]); const { status } = parseBody(config.data) as { status: StatusPedido }
     const i = pedidos.findIndex(p=>p.id===id); if(i<0) return err('pedido não encontrado',404)
@@ -175,9 +112,6 @@ export function enableMock(api: AxiosInstance){
     pedidos[i].status = 'RECEBIDO'; pedidos[i].updatedAt = nowISO(); return ok(pedidos[i])
   })
 
-  mock.onAny().reply(config => {
-    return err(`Rota mock não definida: ${config.method?.toUpperCase()} ${config.url}`, 404)
-  })
-
+  mock.onAny().reply(config => err(`Rota mock não definida: ${config.method?.toUpperCase()} ${config.url}`, 404))
   return mock
 }

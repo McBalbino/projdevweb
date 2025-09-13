@@ -4,7 +4,6 @@
 @tailwind utilities;
 html, body, #root { height: 100%; }
 
-
 /* === Petshop theme helpers (blue/green) === */
 .bg-pet-auth { @apply bg-gradient-to-br from-sky-600 via-cyan-500 to-emerald-500; }
 .bg-pet-app  { @apply bg-gradient-to-b  from-sky-50  via-cyan-50  to-emerald-50; }
@@ -12,3 +11,19 @@ html, body, #root { height: 100%; }
 .btn-accent  { @apply bg-sky-600 hover:bg-sky-700 text-white; }
 .badge-primary { @apply bg-emerald-600 text-white; }
 .badge-accent  { @apply bg-sky-100 text-sky-800; }
+
+/* Tabs petshop */
+.tabs-wrap { @apply flex gap-2 rounded-2xl p-1 bg-gradient-to-r from-sky-100 via-cyan-100 to-emerald-100 border border-sky-100; }
+.tabs-trigger { @apply px-3 py-1.5 text-sm rounded-xl transition; }
+.tabs-trigger-active { @apply bg-white shadow text-emerald-700; }
+.tabs-trigger-inactive { @apply text-sky-700/70 hover:text-sky-800; }
+
+/* Card polish */
+.card { @apply bg-white/90 backdrop-blur border rounded-2xl shadow-sm; }
+.card-header-grad { @apply bg-gradient-to-r from-sky-500 to-emerald-500 text-white rounded-t-2xl; }
+.card-title-strong { @apply font-semibold text-lg; }
+.card-desc { @apply text-white/90 text-sm; }
+
+/* Interações: foco e hover */
+:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,0.35); }
+table tr:hover { background: rgba(56,189,248,0.08); }

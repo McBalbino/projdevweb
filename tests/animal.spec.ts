@@ -29,13 +29,8 @@ describe('Model: Animal', () => {
     expect(erro).to.exist;
   });
 
-  it('3) deve atualizar idade do animal', async () => {
-    const dono = await Client.create({ nome: 'Dono3', telefone: '33', email: 'd3@x.com', senha: 'x' });
-    const a = await Animal.create({ nome: 'Mimi', especie: 'Gato', clienteId: dono.id });
-    const again = await Animal.findByPk(a.id);
-  });
 
-  it('4) deve listar animais por cliente (findAll com where)', async () => {
+  it('3) deve listar animais por cliente (findAll com where)', async () => {
     const dono = await Client.create({ nome: 'Dono4', telefone: '44', email: 'd4@x.com', senha: 'x' });
     await Animal.create({ nome: 'A1', especie: 'Ave', clienteId: dono.id });
     await Animal.create({ nome: 'A2', especie: 'Ave', clienteId: dono.id });
@@ -43,7 +38,7 @@ describe('Model: Animal', () => {
     expect(lista.length).to.equal(2);
   });
 
-  it('5) deve deletar animal', async () => {
+  it('4) deve deletar animal', async () => {
     const dono = await Client.create({ nome: 'Dono5', telefone: '55', email: 'd5@x.com', senha: 'x' });
     const a = await Animal.create({ nome: 'Bolt', especie: 'Cachorro', clienteId: dono.id });
     await Animal.destroy({ where: { id: a.id } });

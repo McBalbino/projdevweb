@@ -5,7 +5,6 @@ export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
   timeout: 15000,
 })
-
 console.info('API URL:', api.defaults.baseURL)
 
 if (import.meta.env.VITE_USE_MOCK === '1') {
