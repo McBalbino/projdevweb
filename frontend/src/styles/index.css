@@ -1,0 +1,14 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html, body, #root { height: 100%; }
+
+
+/* === Petshop theme helpers (blue/green) === */
+.bg-pet-auth { @apply bg-gradient-to-br from-sky-600 via-cyan-500 to-emerald-500; }
+.bg-pet-app  { @apply bg-gradient-to-b  from-sky-50  via-cyan-50  to-emerald-50; }
+.btn-primary { @apply bg-emerald-600 hover:bg-emerald-700 text-white; }
+.btn-accent  { @apply bg-sky-600 hover:bg-sky-700 text-white; }
+.badge-primary { @apply bg-emerald-600 text-white; }
+.badge-accent  { @apply bg-sky-100 text-sky-800; }
