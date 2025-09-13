@@ -9,6 +9,7 @@ import { AuthController } from './controllers/AuthController';
 import { FornecedorController } from './controllers/FornecedorController';
 import { ProdutoFornecedorController } from './controllers/ProdutoFornecedorController';
 import { PedidoCompraController } from './controllers/PedidoCompraController';
+import { ConsultaController } from './controllers/ConsultaController';
 
 import { autenticarToken, autorizar } from './middlewares/auth';
 
@@ -23,6 +24,7 @@ const clientCtrl = new ClientController();
 const animalCtrl = new AnimalController();
 const fornecedorCtrl = new FornecedorController();
 const produtoFornecedorCtrl = new ProdutoFornecedorController();
+const consultaCtrl = new ConsultaController();
 const pedidoCtrl = new PedidoCompraController();
 
 // Auth
@@ -70,6 +72,15 @@ app.get('/pedidos-compra', autenticarToken, autorizar(['admin']), pedidoCtrl.lis
 app.get('/pedidos-compra/:id', autenticarToken, autorizar(['admin']), pedidoCtrl.show);
 app.patch('/pedidos-compra/:id/status', autenticarToken, autorizar(['admin']), pedidoCtrl.status);
 app.post('/pedidos-compra/:id/receber', autenticarToken, autorizar(['admin']), pedidoCtrl.receber);
+
+
+// Consultas
+app.post('/consultas', autenticarToken, autorizar(['cliente','admin']), consultaCtrl.create);
+app.get('/consultas', autenticarToken, autorizar(['admin']), consultaCtrl.listAll);
+app.get('/consultas/minhas', autenticarToken, autorizar(['cliente']), consultaCtrl.listMine);
+app.put('/consultas/:id', autenticarToken, autorizar(['cliente','admin']), consultaCtrl.update);
+app.delete('/consultas/:id', autenticarToken, autorizar(['cliente','admin']), consultaCtrl.remove);
+
 
 if (process.env.NODE_ENV !== 'test') {
   sequelize.sync().then(() => {

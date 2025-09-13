@@ -5,6 +5,7 @@ import { ProdutoFornecedor } from './ProdutoFornecedor';
 import { PedidoCompra } from './PedidoCompra';
 import { PedidoCompraItem } from './PedidoCompraItem';
 import { Admin } from './Admin';
+import { Consulta } from './Consulta';
 
 // Client - Animal
 Client.hasMany(Animal, { foreignKey: 'clienteId', as: 'animais' });
@@ -28,3 +29,11 @@ PedidoCompraItem.belongsTo(PedidoCompra, { foreignKey: 'pedidoId', as: 'pedido' 
 // ProdutoFornecedor - PedidoCompraItem
 ProdutoFornecedor.hasMany(PedidoCompraItem, { foreignKey: 'produtoFornecedorId', as: 'itens' });
 PedidoCompraItem.belongsTo(ProdutoFornecedor, { foreignKey: 'produtoFornecedorId', as: 'produtoFornecedor' });
+
+
+/** Consultas: Cliente 1-N Consulta; Animal 1-N Consulta */
+Client.hasMany(Consulta, { foreignKey: 'clienteId', as: 'consultas' });
+Consulta.belongsTo(Client, { foreignKey: 'clienteId', as: 'cliente' });
+
+Animal.hasMany(Consulta, { foreignKey: 'animalId', as: 'consultas' });
+Consulta.belongsTo(Animal, { foreignKey: 'animalId', as: 'animal' });

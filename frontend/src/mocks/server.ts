@@ -8,6 +8,8 @@ type Animal = { id:number; nome:string; especie:'cachorro'|'gato'|'outro'; clien
 type Fornecedor = { id:number; nome:string; cnpj:string; email?:string; telefone?:string; endereco?:string }
 type ProdutoFornecedor = { id:number; fornecedorId:number; nome:string; sku:string; preco:number; ativo:boolean }
 type StatusPedido = 'ABERTO'|'APROVADO'|'ENVIADO'|'RECEBIDO'|'CANCELADO'
+type ConsultaStatus = 'AGENDADA'|'CONCLUIDA'|'CANCELADA'
+type Consulta = { id:number; clienteId:number; animalId:number; tipo:string; data:string; observacoes?:string; status:ConsultaStatus }
 type PedidoCompraItem = { id:number; pedidoId:number; produtoFornecedorId:number; quantidade:number; precoUnitario:number; subtotal:number }
 type PedidoCompra = { id:number; fornecedorId:number; adminId:number; status:StatusPedido; total:number; createdAt:string; updatedAt:string }
 
@@ -24,9 +26,15 @@ const clients: Client[] = [
   { id: nextId(), nome: "Bruno Souza", email: "bruno@exemplo.com", telefone: "(83) 9 9999-0002", tipo:'cliente' },
 ]
 const animais: Animal[] = [
-  { id: nextId(), nome: "Thor", especie: "cachorro", clienteId: clients[0].id },
-  { id: nextId(), nome: "Luna", especie: "gato", clienteId: clients[1].id },
+  { id: nextId(), nome: 'Rex', especie: 'cachorro', clienteId: 2 },
+  { id: nextId(), nome: 'Mimi', especie: 'gato', clienteId: 2 },
 ]
+
+const consultas: Consulta[] = [
+  { id: nextId(), clienteId: users.find(u=>u.tipo==='cliente')!.id, animalId: animais[0].id, tipo: 'Banho', data: new Date(Date.now()+86400000).toISOString(), observacoes: 'Checar pele', status: 'AGENDADA' },
+  { id: nextId(), clienteId: users.find(u=>u.tipo==='cliente')!.id, animalId: animais[1].id, tipo: 'Tosa',  data: new Date(Date.now()+172800000).toISOString(), observacoes: '',            status: 'AGENDADA' },
+]
+
 const fornecedores: Fornecedor[] = [
   { id: nextId(), nome: "PetSupplies LTDA", cnpj: "12.345.678/0001-90", telefone:"(83) 3333-1212" },
   { id: nextId(), nome: "Rações do Norte", cnpj: "98.765.432/0001-10", telefone:"(83) 3333-4545" },
@@ -110,6 +118,25 @@ export function enableMock(api: AxiosInstance){
   mock.onPost(/\/pedidos-compra\/\d+\/receber$/).reply(config => {
     const id = Number(config.url!.split('/')[2]); const i = pedidos.findIndex(p=>p.id===id); if(i<0) return err('pedido não encontrado',404)
     pedidos[i].status = 'RECEBIDO'; pedidos[i].updatedAt = nowISO(); return ok(pedidos[i])
+  })
+
+  
+  // CONSULTAS (mock)
+  mock.onGet('/consultas').reply(config => ok(consultas))
+  mock.onPost('/consultas').reply(config => {
+    const body = parseBody(config.data)
+    if (!body?.clienteId || !body?.animalId || !body?.tipo || !body?.data) return err('Campos obrigatórios: clienteId, animalId, tipo, data', 400)
+    const c: Consulta = { id: nextId(), clienteId: Number(body.clienteId), animalId: Number(body.animalId), tipo: String(body.tipo), data: String(body.data), observacoes: body.observacoes||'', status: body.status || 'AGENDADA' }
+    consultas.push(c); return ok(c, 201)
+  })
+  mock.onPut(/\/consultas\/\d+$/).reply(config => {
+    const id = Number(config.url!.split('/').pop()); const body = parseBody(config.data)
+    const i = consultas.findIndex(c=>c.id===id); if(i<0) return err('consulta não encontrada',404)
+    consultas[i] = { ...consultas[i], ...body }; return ok(consultas[i])
+  })
+  mock.onDelete(/\/consultas\/\d+$/).reply(config => {
+    const id = Number(config.url!.split('/').pop()); const i = consultas.findIndex(c=>c.id===id); if(i<0) return err('consulta não encontrada',404)
+    consultas.splice(i,1); return ok({ ok:true })
   })
 
   mock.onAny().reply(config => err(`Rota mock não definida: ${config.method?.toUpperCase()} ${config.url}`, 404))
