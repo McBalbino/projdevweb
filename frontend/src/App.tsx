@@ -15,6 +15,7 @@ import { Clients } from '@/api/clients'
 import { Animais } from '@/api/animais'
 import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos, StatusPedido } from '@/api/pedidos'
+import { Consultas } from '@/api/consultas'
 
 function AppShell(){ const { user, logout } = useAuth(); return (
   <div className="flex items-center justify-between mb-6">
@@ -162,14 +163,49 @@ function ClientesPage(){
 }
 
 function AnimaisPage(){
-  const [list,setList]=useState<any[]>([]); const [q,setQ]=useState('')
-  React.useEffect(()=>{ Animais.list().then(setList).catch(()=>toast.error('Falha ao carregar animais')) },[])
-  return (<Card className="rounded-2xl"><CardContent className="p-0">
-    <div className="p-3"><SearchBox value={q} onChange={setQ} placeholder="Buscar por nome, espécie ou cliente" /></div>
-    <Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Cliente</TableHead></TableRow></TableHeader>
-    <TableBody>{list.filter(a=>`${a.nome} ${a.especie}`.toLowerCase().includes(q.toLowerCase())).map((a)=>(<TableRow key={a.id}><TableCell className="font-medium">{a.nome}</TableCell><TableCell className="capitalize">{a.especie}</TableCell><TableCell>{a.clienteId}</TableCell></TableRow>))}</TableBody></Table>
-  </CardContent></Card>)
+  const [list,setList]=useState<any[]>([])
+  const [q,setQ]=useState('')
+
+  React.useEffect(()=>{
+    Animais.list().then(setList).catch(()=>toast.error('Falha ao carregar animais'))
+  },[])
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="card-header-grad rounded-t-2xl">
+        <CardTitle className="text-white">Animais cadastrados</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="p-3">
+          <SearchBox value={q} onChange={setQ} placeholder="Buscar por nome ou espécie" />
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Espécie</TableHead>
+              <TableHead>Cliente</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list
+              .filter(a => `${a.nome} ${a.especie}`.toLowerCase().includes(q.toLowerCase()))
+              .map((a:any)=>(
+                <TableRow key={a.id}>
+                  <TableCell>{a.id}</TableCell>
+                  <TableCell className="font-medium">{a.nome}</TableCell>
+                  <TableCell className="capitalize">{a.especie}</TableCell>
+                  <TableCell>{a.clienteId}</TableCell>
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
 }
+
 
 function FornecedoresPage(){
   const { user } = useAuth()
@@ -275,28 +311,211 @@ function RelatoriosPage(){
   )
 }
 
+
+
+function AdminConsultasPage(){
+  const [list,setList]=useState<any[]>([])
+  const [editRow,setEditRow]=useState<any|null>(null)
+  React.useEffect(()=>{ Consultas.list().then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[])
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const save = async()=>{ if(!editRow) return; await Consultas.update(editRow.id, editRow); toast.success('Consulta atualizada'); setEditRow(null); setList(await Consultas.list()) }
+  const remove = async(id:number)=>{ await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.list()) }
+  const setStatus = async(id:number, status:'AGENDADA'|'CONCLUIDA'|'CANCELADA')=>{ await Consultas.update(id, { status }); toast.success('Status atualizado'); setList(await Consultas.list()) }
+  const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
+  return (<Card className="rounded-2xl"><CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Consultas agendadas</CardTitle></CardHeader>
+    <CardContent className="p-0">
+      <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Cliente</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-64">Ações</TableHead></TableRow></TableHeader>
+      <TableBody>{list.map((c:any)=>(<TableRow key={c.id}>
+        <TableCell>{c.id}</TableCell><TableCell>{c.clienteId}</TableCell><TableCell>{c.animalId}</TableCell>
+        <TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell>
+        <TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell>
+        <TableCell className="flex gap-2">
+          <Button variant="secondary" onClick={()=>setEditRow({...c})}>Editar</Button>
+          <Button variant="outline" onClick={()=>setStatus(c.id,'CONCLUIDA')}>Concluir</Button>
+          <Button variant="outline" onClick={()=>setStatus(c.id,'CANCELADA')}>Cancelar</Button>
+          <Button variant="destructive" onClick={()=>remove(c.id)}>Excluir</Button>
+        </TableCell>
+      </TableRow>))}</TableBody></Table>
+      {editRow && <div className="p-4 border-t grid md:grid-cols-5 gap-2">
+        <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
+        <Input type="datetime-local" value={editRow.data.slice(0,16)} onChange={e=>setEditRow({...editRow, data:new Date(e.target.value).toISOString()})}/>
+        <Input value={editRow.observacoes||''} onChange={e=>setEditRow({...editRow, observacoes:e.target.value})} placeholder="Observações"/>
+        <Select value={editRow.status} onValueChange={(v:any)=>setEditRow({...editRow, status:v})}>
+          <SelectTrigger><SelectValue placeholder="Status"/></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="AGENDADA">AGENDADA</SelectItem>
+            <SelectItem value="CONCLUIDA">CONCLUIDA</SelectItem>
+            <SelectItem value="CANCELADA">CANCELADA</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex gap-2"><Button onClick={save}>Salvar</Button><Button variant="ghost" onClick={()=>setEditRow(null)}>Cancelar</Button></div>
+      </div>}
+    </CardContent></Card>)
+}
+
+function ClienteConsultasPage(){
+  const { user } = useAuth()
+  const [list,setList]=useState<any[]>([])
+  const [form,setForm]=useState<{animalId:number; tipo:string; data:string; observacoes?:string}>({animalId:0, tipo:'', data:'', observacoes:''})
+  React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[user])
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const create = async()=>{
+    if(!user) return
+    if (!form.animalId || !form.tipo || !form.data) return toast.error('Preencha todos os campos')
+    await Consultas.create({ clienteId:user.id, animalId:Number(form.animalId), tipo:form.tipo, data:new Date(form.data).toISOString(), observacoes: form.observacoes })
+    toast.success('Consulta agendada'); setForm({animalId:0,tipo:'',data:'',observacoes:''}); setList(await Consultas.listMine(user.id))
+  }
+  const remove = async(id:number)=>{ if(!user) return; await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.listMine(user.id)) }
+  const add1h = async(id:number, oldISO:string)=>{ if(!user) return; const next = new Date(new Date(oldISO).getTime()+3600000).toISOString(); await Consultas.update(id, { data: next }); toast.success('Consulta reagendada'); setList(await Consultas.listMine(user.id)) }
+  const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
+  return (<div className="grid gap-4 md:grid-cols-2">
+    <Card className="rounded-2xl">
+      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Agendar Consulta</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <Input type="number" placeholder="ID do meu Animal" value={form.animalId||''} onChange={e=>setForm({...form, animalId:Number(e.target.value)||0})}/>
+        <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm({...form, tipo:e.target.value})}/>
+        <Input type="datetime-local" value={form.data} onChange={e=>setForm({...form, data:e.target.value})}/>
+        <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm({...form, observacoes:e.target.value})}/>
+        <Button className="w-full" onClick={create}>Agendar</Button>
+      </CardContent>
+    </Card>
+    <Card className="rounded-2xl">
+      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Minhas Consultas</CardTitle></CardHeader>
+      <CardContent className="p-0">
+        <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-48">Ações</TableHead></TableRow></TableHeader>
+        <TableBody>{list.map((c:any)=>(<TableRow key={c.id}>
+          <TableCell>{c.id}</TableCell><TableCell>{c.animalId}</TableCell><TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell>
+          <TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell>
+          <TableCell className="flex gap-2"><Button variant="secondary" onClick={()=>add1h(c.id, c.data)}>+1h</Button><Button variant="destructive" onClick={()=>remove(c.id)}>Excluir</Button></TableCell>
+        </TableRow>))}</TableBody></Table>
+      </CardContent>
+    </Card>
+  </div>)
+}
+
+function ClienteHistoricoPage(){
+  const { user } = useAuth()
+  const [list,setList]=useState<any[]>([])
+  React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar histórico')) },[user])
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const passado = list.filter((c:any)=> new Date(c.data).getTime() < Date.now())
+  const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
+  return (<Card className="rounded-2xl">
+    <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Histórico de Consultas</CardTitle></CardHeader>
+    <CardContent className="p-0">
+      <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead></TableRow></TableHeader>
+      <TableBody>{passado.map((c:any)=>(<TableRow key={c.id}><TableCell>{c.id}</TableCell><TableCell>{c.animalId}</TableCell><TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell><TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell><TableCell>{c.observacoes||''}</TableCell></TableRow>))}</TableBody></Table>
+    </CardContent>
+  </Card>)
+}
+
+
+function MeusAnimaisPage(){
+  const { user } = useAuth()
+  const [list,setList]=useState<any[]>([])
+  const [form,setForm]=useState<{nome:string; especie:string}>({nome:'', especie:''})
+  const [editing,setEditing]=useState<any|null>(null)
+
+  const load = async()=>{ if(!user) return; setList(await Animais.listMine(user.id)) }
+  React.useEffect(()=>{ load().catch(()=>toast.error('Falha ao carregar meus animais')) },[user])
+
+  const create = async()=>{
+    if(!user) return
+    if(!form.nome || !form.especie) return toast.error('Informe nome e espécie')
+    await Animais.create({ nome: form.nome, especie: form.especie, clienteId: user.id })
+    setForm({nome:'', especie:''}); toast.success('Animal cadastrado!'); await load()
+  }
+
+  const save = async()=>{
+    if(!editing) return
+    await Animais.update(editing.id, { nome: editing.nome, especie: editing.especie })
+    setEditing(null); toast.success('Animal atualizado!'); await load()
+  }
+
+  const remove = async(id:number)=>{ await Animais.remove(id); toast.success('Animal removido'); await load() }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Cadastrar meu animal</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <Input placeholder="Nome" value={form.nome} onChange={e=>setForm({...form, nome:e.target.value})}/>
+          <Input placeholder="Espécie (ex.: cachorro, gato)" value={form.especie} onChange={e=>setForm({...form, especie:e.target.value})}/>
+          <Button className="w-full" onClick={create}>Salvar</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Meus animais</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
+            </TableHeader>
+            <TableBody>
+              {list.map((a:any)=>(
+                <TableRow key={a.id}>
+                  <TableCell>{editing?.id===a.id ? <Input value={editing.nome} onChange={e=>setEditing({...editing, nome:e.target.value})}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
+                  <TableCell>{editing?.id===a.id ? <Input value={editing.especie} onChange={e=>setEditing({...editing, especie:e.target.value})}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
+                  <TableCell className="flex gap-2">
+                    {editing?.id===a.id ? (<>
+                      <Button size="sm" onClick={save}>Salvar</Button>
+                      <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
+                    </>) : (<>
+                      <Button size="sm" variant="secondary" onClick={()=>setEditing(a)}>Editar</Button>
+                      <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
+                    </>)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function Home(){
   const { user } = useAuth()
   const isAdmin = user?.tipo === 'admin'
   return (<div className="min-h-screen w-full bg-pet-app">
     <div className="max-w-6xl mx-auto px-4 py-8">
       <AppShell/>
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid grid-cols-5 lg:w-[820px]">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="pedidos" className="gap-2"><Calendar className="h-4 w-4"/>Pedidos</TabsTrigger>
-          <TabsTrigger value="fornecedores" className="gap-2"><Building2 className="h-4 w-4"/>Fornecedores</TabsTrigger>
-          <TabsTrigger value="animais" className="gap-2"><PawPrint className="h-4 w-4"/>Animais</TabsTrigger>
-          {isAdmin && <TabsTrigger value="clientes" className="gap-2"><Users className="h-4 w-4"/>Clientes</TabsTrigger>}
-        </TabsList>
-        <TabsContent value="dashboard"><DashboardPage/></TabsContent>
-        <TabsContent value="pedidos"><PedidosPage/></TabsContent>
-        <TabsContent value="fornecedores"><FornecedoresPage/></TabsContent>
-        <TabsContent value="animais"><AnimaisPage/></TabsContent>
-        {isAdmin && <TabsContent value="clientes"><ClientesPage/></TabsContent>}
+      <Tabs defaultValue={isAdmin ? 'dashboard' : 'animais'} className="space-y-6">
+        {isAdmin ? (<>
+          <TabsList className="grid grid-cols-7 lg:w-[1100px]">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+            <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
+            <TabsTrigger value="animais">Animais</TabsTrigger>
+            <TabsTrigger value="clientes">Clientes</TabsTrigger>
+            <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+            <TabsTrigger value="consultas-admin">Consultas (agendadas)</TabsTrigger>
+          </TabsList>
+          <TabsContent value="dashboard"><DashboardPage/></TabsContent>
+          <TabsContent value="pedidos"><PedidosPage/></TabsContent>
+          <TabsContent value="fornecedores"><FornecedoresPage/></TabsContent>
+          <TabsContent value="animais"><MeusAnimaisPage/></TabsContent>
+          <TabsContent value="clientes"><ClientesPage/></TabsContent>
+          <TabsContent value="relatorios"><RelatoriosPage/></TabsContent>
+          <TabsContent value="consultas-admin"><AdminConsultasPage/></TabsContent>
+        </>) : (<>
+          <TabsList className="grid grid-cols-4 lg:w-[780px]">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="animais">Meus Animais</TabsTrigger>
+            <TabsTrigger value="consultas">Consultas</TabsTrigger>
+            <TabsTrigger value="historico">Histórico</TabsTrigger>
+          </TabsList>
+          <TabsContent value="dashboard"><DashboardPage/></TabsContent>
+          <TabsContent value="animais"><MeusAnimaisPage/></TabsContent>
+          <TabsContent value="consultas"><ClienteConsultasPage/></TabsContent>
+          <TabsContent value="historico"><ClienteHistoricoPage/></TabsContent>
+        </>)}
       </Tabs>
     </div>
   </div>)
 }
+
 
 export default function App(){ return (<AuthProvider><AuthGate><Home/></AuthGate></AuthProvider>) }
