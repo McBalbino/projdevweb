@@ -53,7 +53,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       await login(email, senha)
       toast.success('Bem-vindo(a)!')
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || e?.message || 'Falha no login')
+      toast.error(e?.response?.data?.message || e?.response?.data?.erro || e?.message || 'Falha no login')
     } finally {
       setLoading(false)
     }
@@ -416,7 +416,11 @@ function MeusAnimaisPage(){
   const [form,setForm]=useState<{nome:string; especie:string}>({nome:'', especie:''})
   const [editing,setEditing]=useState<any|null>(null)
 
-  const load = async()=>{ if(!user) return; setList(await Animais.listMine(user.id)) }
+  const load = async()=>{
+    if(!user) return;
+    const data = user.tipo === 'admin' ? await Animais.list() : await Animais.listMine(user.id)
+    setList(data)
+  }
   React.useEffect(()=>{ load().catch(()=>toast.error('Falha ao carregar meus animais')) },[user])
 
   const create = async()=>{
