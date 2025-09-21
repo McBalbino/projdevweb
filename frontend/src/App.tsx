@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,11 +14,14 @@ import { PawPrint, Users, Building2, Calendar, Search, LogOut, Shield } from 'lu
 import { Clients } from '@/api/clients'
 import { Animais } from '@/api/animais'
 import type { Animal } from '@/api/animais'
-import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
-import { Pedidos, StatusPedido } from '@/api/pedidos'
+
+import { Fornecedores } from '@/api/fornecedores'
+import type { Fornecedor, ProdutoFornecedor } from '@/api/fornecedores'
+import { Pedidos } from '@/api/pedidos'
+import type { PedidoCompra, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
 import type { Consulta } from '@/api/consultas'
-
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 const formatISODateForInput = (value?: string) => {
 
@@ -234,89 +237,524 @@ function AnimaisPage(){
 function FornecedoresPage(){
   const { user } = useAuth()
   const isAdmin = user?.tipo === 'admin'
-  const [list,setList]=useState<any[]>([]); const [q,setQ]=useState('')
-  React.useEffect(()=>{ Fornecedores.list().then(setList).catch(()=>toast.error('Falha ao carregar fornecedores')) },[])
-  const filtered = list.filter((f:any)=>`${f.nome} ${f.cnpj}`.toLowerCase().includes(q.toLowerCase()))
-  return (<>
-    <div className="flex items-center justify-between gap-2 py-2">
-      <SearchBox value={q} onChange={setQ} placeholder="Buscar por nome ou CNPJ" />
-      {isAdmin && <Button className="gap-2">Novo fornecedor</Button>}
+  const [list, setList] = useState<Fornecedor[]>([])
+  const [q, setQ] = useState('')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [catalogo, setCatalogo] = useState<ProdutoFornecedor[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [savingFornecedor, setSavingFornecedor] = useState(false)
+  const [createForm, setCreateForm] = useState(() => ({ nome:'', cnpj:'', email:'', telefone:'', endereco:'' }))
+  const [productForm, setProductForm] = useState(() => ({ nome:'', sku:'', preco:'' }))
+  const [savingProduct, setSavingProduct] = useState(false)
+  const brl = React.useMemo(() => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }), [])
+
+  const resetCreateForm = React.useCallback(() => {
+    setCreateForm({ nome:'', cnpj:'', email:'', telefone:'', endereco:'' })
+  }, [])
+  const resetProductForm = React.useCallback(() => {
+    setProductForm({ nome:'', sku:'', preco:'' })
+  }, [])
+
+  const refresh = React.useCallback(async () => {
+    try {
+      const fornecedores = await Fornecedores.list()
+      setList(fornecedores)
+      if (fornecedores.length === 0) {
+        setSelectedId(null)
+        setCatalogo([])
+        return
+      }
+      setSelectedId(prev => {
+        if (prev && fornecedores.some(f => f.id === prev)) {
+          return prev
+        }
+        return fornecedores[0].id
+      })
+    } catch (e: any) {
+      console.error('Erro ao carregar fornecedores', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao carregar fornecedores')
+      setList([])
+      setSelectedId(null)
+      setCatalogo([])
+    }
+  }, [])
+
+  React.useEffect(() => { void refresh() }, [refresh])
+
+  React.useEffect(() => {
+    if (selectedId == null) {
+      setCatalogo([])
+      return
+    }
+    let ativo = true
+    const load = async () => {
+      try {
+        const itens = await Fornecedores.listProdutos(selectedId)
+        if (ativo) setCatalogo(itens)
+      } catch (e: any) {
+        console.error('Erro ao carregar catálogo do fornecedor', e)
+        if (ativo) {
+          toast.error(e?.response?.data?.erro || e?.message || 'Falha ao carregar catálogo do fornecedor')
+          setCatalogo([])
+        }
+      }
+    }
+    void load()
+    return () => { ativo = false }
+  }, [selectedId])
+
+  const filtered = React.useMemo(
+    () => list.filter(f => `${f.nome} ${f.cnpj}`.toLowerCase().includes(q.toLowerCase())),
+    [list, q]
+  )
+  const selected = selectedId != null ? list.find(f => f.id === selectedId) ?? null : null
+
+  const createFornecedor = async () => {
+    const payload = {
+      nome: createForm.nome.trim(),
+      cnpj: createForm.cnpj.trim(),
+      email: createForm.email.trim() || undefined,
+      telefone: createForm.telefone.trim() || undefined,
+      endereco: createForm.endereco.trim() || undefined,
+    }
+    if (!payload.nome || !payload.cnpj) {
+      toast.error('Informe nome e CNPJ do fornecedor')
+      return
+    }
+    try {
+      setSavingFornecedor(true)
+      const novo = await Fornecedores.create(payload)
+      toast.success('Fornecedor cadastrado com sucesso')
+      setCreateOpen(false)
+      resetCreateForm()
+      await refresh()
+      setSelectedId(novo.id)
+    } catch (e: any) {
+      console.error('Erro ao criar fornecedor', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao criar fornecedor')
+    } finally {
+      setSavingFornecedor(false)
+    }
+  }
+
+  const adicionarProduto = async () => {
+    if (selectedId == null) {
+      toast.error('Selecione um fornecedor para adicionar produtos')
+      return
+    }
+    const nome = productForm.nome.trim()
+    const sku = productForm.sku.trim()
+    const precoValor = Number(productForm.preco)
+    if (!nome || !sku || !productForm.preco) {
+      toast.error('Informe nome, SKU e preço do produto')
+      return
+    }
+    if (!Number.isFinite(precoValor) || precoValor <= 0) {
+      toast.error('Informe um preço válido')
+      return
+    }
+    try {
+      setSavingProduct(true)
+      await Fornecedores.addProduto(selectedId, { nome, sku, preco: precoValor })
+      toast.success('Produto adicionado ao catálogo')
+      resetProductForm()
+      const itens = await Fornecedores.listProdutos(selectedId)
+      setCatalogo(itens)
+    } catch (e: any) {
+      console.error('Erro ao adicionar produto ao fornecedor', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao adicionar produto')
+    } finally {
+      setSavingProduct(false)
+    }
+  }
+
+  const removerFornecedor = async () => {
+    if (!selected) return
+    if (typeof window !== 'undefined' && !window.confirm(`Remover o fornecedor ${selected.nome}?`)) return
+    try {
+      await Fornecedores.remove(selected.id)
+      toast.success('Fornecedor removido')
+      await refresh()
+      resetProductForm()
+    } catch (e: any) {
+      console.error('Erro ao remover fornecedor', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao remover fornecedor')
+    }
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl">
+          <CardTitle className="text-white">Fornecedores</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between gap-2 p-3">
+            <SearchBox value={q} onChange={setQ} placeholder="Buscar por nome ou CNPJ" />
+            {isAdmin && (
+              <Dialog
+                open={createOpen}
+                onOpenChange={open => {
+                  setCreateOpen(open)
+                  if (!open) {
+                    resetCreateForm()
+                    setSavingFornecedor(false)
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button className="gap-2">Novo fornecedor</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Novo fornecedor</DialogTitle>
+                    <DialogDescription>Cadastre um novo parceiro para disponibilizar produtos no catálogo.</DialogDescription>
+                  </DialogHeader>
+                  <div className="p-4 pt-0 space-y-3">
+                    <div className="grid gap-1">
+                      <Label>Nome</Label>
+                      <Input value={createForm.nome} onChange={e => setCreateForm(prev => ({ ...prev, nome: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>CNPJ</Label>
+                      <Input value={createForm.cnpj} onChange={e => setCreateForm(prev => ({ ...prev, cnpj: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>E-mail</Label>
+                      <Input type="email" value={createForm.email} onChange={e => setCreateForm(prev => ({ ...prev, email: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>Telefone</Label>
+                      <Input value={createForm.telefone} onChange={e => setCreateForm(prev => ({ ...prev, telefone: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>Endereço</Label>
+                      <Input value={createForm.endereco} onChange={e => setCreateForm(prev => ({ ...prev, endereco: e.target.value }))} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" type="button" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                    <Button onClick={createFornecedor} disabled={savingFornecedor}>
+                      {savingFornecedor ? 'Salvando...' : 'Salvar fornecedor'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>CNPJ</TableHead>
+                <TableHead className="w-40 text-right">Detalhes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="py-6 text-center text-sm text-gray-500">
+                    Nenhum fornecedor encontrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map(f => (
+                  <TableRow
+                    key={f.id}
+                    className={`cursor-pointer ${selectedId === f.id ? 'bg-emerald-50' : ''}`}
+                    onClick={() => setSelectedId(f.id)}
+                  >
+                    <TableCell className="font-medium">{f.nome}</TableCell>
+                    <TableCell>{f.cnpj}</TableCell>
+                    <TableCell className="text-right text-xs text-emerald-700">
+                      {selectedId === f.id ? 'Selecionado' : 'Ver detalhes'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl">
+          <CardTitle className="text-white">Detalhes do fornecedor</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!selected ? (
+            <p className="text-sm text-gray-500">Selecione um fornecedor para visualizar contato e catálogo.</p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <div>
+                  <p className="text-lg font-semibold text-emerald-800">{selected.nome}</p>
+                  <p className="text-sm text-gray-500">CNPJ: {selected.cnpj}</p>
+                </div>
+                {selected.email && <p className="text-sm text-gray-500">E-mail: {selected.email}</p>}
+                {selected.telefone && <p className="text-sm text-gray-500">Telefone: {selected.telefone}</p>}
+                {selected.endereco && <p className="text-sm text-gray-500">Endereço: {selected.endereco}</p>}
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-600">Catálogo ativo</div>
+                {catalogo.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhum produto cadastrado para este fornecedor.</p>
+                ) : (
+                  <div className="max-h-48 overflow-auto border rounded-xl divide-y">
+                    {catalogo.map(prod => (
+                      <div key={prod.id} className="flex items-center justify-between p-2 text-sm">
+                        <div>
+                          <div className="font-medium">{prod.nome}</div>
+                          <div className="text-xs text-gray-500">{prod.sku}</div>
+                        </div>
+                        <div className="font-semibold text-emerald-700">{brl.format(Number(prod.preco ?? 0))}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {isAdmin && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-gray-600">Adicionar produto ao catálogo</div>
+                  <div className="grid gap-2">
+                    <div className="grid gap-1">
+                      <Label>Nome</Label>
+                      <Input value={productForm.nome} onChange={e => setProductForm(prev => ({ ...prev, nome: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>SKU</Label>
+                      <Input value={productForm.sku} onChange={e => setProductForm(prev => ({ ...prev, sku: e.target.value }))} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>Preço</Label>
+                      <Input type="number" min={0} step="0.01" value={productForm.preco} onChange={e => setProductForm(prev => ({ ...prev, preco: e.target.value }))} />
+                    </div>
+                    <Button onClick={adicionarProduto} disabled={savingProduct}>
+                      {savingProduct ? 'Salvando...' : 'Adicionar produto'}
+                    </Button>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button variant="destructive" size="sm" onClick={removerFornecedor}>Remover fornecedor</Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
-    <Card className="rounded-2xl"><CardContent className="p-0">
-      <Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>CNPJ</TableHead><TableHead className="w-32"></TableHead></TableRow></TableHeader>
-      <TableBody>{filtered.map((f:any)=>(<TableRow key={f.id}>
-        <TableCell className="font-medium">{f.nome}</TableCell><TableCell>{f.cnpj}</TableCell>
-        <TableCell>{isAdmin ? <span className="text-xs text-emerald-700">Ações habilitadas (editar/excluir)</span> : <span className="text-xs text-gray-400">Somente leitura</span>}</TableCell>
-      </TableRow>))}</TableBody></Table>
-    </CardContent></Card>
-  </>)
+  )
 }
 
 function PedidosPage(){
   const { user } = useAuth()
   const isAdmin = user?.tipo === 'admin'
-  const [pedidos,setPedidos]=useState<any[]>([])
-  const [fornecedores,setFornecedores]=useState<any[]>([])
-  const [fornecedorId,setFornecedorId]=useState<number|undefined>()
-  const [catalogo,setCatalogo]=useState<ProdutoFornecedor[]>([])
-  const [itens,setItens]=useState<{produtoFornecedorId:number; quantidade:number; precoUnitario?:number}[]>([])
-  const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-  const refresh = async()=>{ const [p, f] = await Promise.all([Pedidos.list(), Fornecedores.list()]); setPedidos(p); setFornecedores(f) }
-  React.useEffect(()=>{ refresh().catch(()=>toast.error('Falha ao carregar pedidos')) },[])
-  const loadCatalogo = async(id:number)=>{ setFornecedorId(id); const prods = await Fornecedores.listProdutos(id); setCatalogo(prods); setItens([]) }
-  const addItem = (produtoFornecedorId:number)=>{ setItens(prev=>[...prev, { produtoFornecedorId, quantidade:1 }]) }
-  const createPedido = async()=>{ if (!fornecedorId || itens.length===0) return toast.error('Selecione fornecedor e itens'); await Pedidos.create(fornecedorId, itens); toast.success('Pedido criado'); setItens([]); setCatalogo([]); setFornecedorId(undefined); refresh() }
-  const setStatus = async(id:number, status:StatusPedido)=>{ await Pedidos.setStatus(id, status); toast.success('Status atualizado'); refresh() }
-  const receber = async(id:number)=>{ await Pedidos.receber(id); toast.success('Pedido recebido'); refresh() }
-  return (<div className="grid gap-4 md:grid-cols-2">
-    <Card className="rounded-2xl">
-      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Novo Pedido de Compra</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-2">
-          <Label>Fornecedor</Label>
-          <div className="relative">
-            <Select value={fornecedorId as any} onValueChange={(v:any)=>loadCatalogo(Number(v))}>
-              <SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger>
-              <SelectContent>{fornecedores.map((f:any)=>(<SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>))}</SelectContent>
-            </Select>
+  const [pedidos, setPedidos] = useState<PedidoCompra[]>([])
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [fornecedorId, setFornecedorId] = useState<number | undefined>()
+  const [catalogo, setCatalogo] = useState<ProdutoFornecedor[]>([])
+  const [itens, setItens] = useState<{produtoFornecedorId:number; quantidade:number; precoUnitario?:number}[]>([])
+  const brl = React.useMemo(() => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }), [])
+
+  const refresh = React.useCallback(async () => {
+    try {
+      const listaFornecedores = await Fornecedores.list()
+      setFornecedores(listaFornecedores)
+    } catch (e: any) {
+      console.error('Erro ao carregar fornecedores', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao carregar fornecedores')
+      setFornecedores([])
+    }
+    if (isAdmin) {
+      try {
+        const listaPedidos = await Pedidos.list()
+        setPedidos(listaPedidos)
+      } catch (e: any) {
+        console.error('Erro ao carregar pedidos', e)
+        toast.error(e?.response?.data?.erro || e?.message || 'Falha ao carregar pedidos')
+        setPedidos([])
+      }
+    } else {
+      setPedidos([])
+    }
+  }, [isAdmin])
+
+  React.useEffect(() => { void refresh() }, [refresh])
+
+  React.useEffect(() => {
+    if (!fornecedorId) return
+    if (!fornecedores.some(f => f.id === fornecedorId)) {
+      setFornecedorId(undefined)
+      setCatalogo([])
+      setItens([])
+    }
+  }, [fornecedores, fornecedorId])
+
+  const loadCatalogo = async (id:number) => {
+    setFornecedorId(id)
+    setItens([])
+    try {
+      const prods = await Fornecedores.listProdutos(id)
+      setCatalogo(prods)
+    } catch (e: any) {
+      console.error('Erro ao carregar catálogo para pedido', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao carregar catálogo do fornecedor')
+      setCatalogo([])
+    }
+  }
+
+  const handleFornecedorChange = (value:string) => {
+    const id = Number(value)
+    if (Number.isNaN(id)) return
+    void loadCatalogo(id)
+  }
+
+  const addItem = (produtoFornecedorId:number) => {
+    setItens(prev => [...prev, { produtoFornecedorId, quantidade:1 }])
+  }
+
+  const removeItem = (index:number) => {
+    setItens(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const createPedido = async () => {
+    if (!fornecedorId || itens.length === 0) {
+      toast.error('Selecione fornecedor e itens')
+      return
+    }
+    try {
+      await Pedidos.create(fornecedorId, itens)
+      toast.success('Pedido criado')
+      setItens([])
+      setCatalogo([])
+      setFornecedorId(undefined)
+      await refresh()
+    } catch (e: any) {
+      console.error('Erro ao criar pedido', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Falha ao criar pedido')
+    }
+  }
+
+  const atualizarStatus = async (id:number, status:StatusPedido) => {
+    try {
+      await Pedidos.setStatus(id, status)
+      toast.success('Status atualizado')
+      await refresh()
+    } catch (e: any) {
+      console.error('Erro ao atualizar status do pedido', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Não foi possível atualizar o status')
+    }
+  }
+
+  const receber = async (id:number) => {
+    try {
+      await Pedidos.receber(id)
+      toast.success('Pedido recebido')
+      await refresh()
+    } catch (e: any) {
+      console.error('Erro ao receber pedido', e)
+      toast.error(e?.response?.data?.erro || e?.message || 'Não foi possível receber o pedido')
+    }
+  }
+
+  const fornecedorPorId = React.useMemo(() => {
+    const map = new Map<number, string>()
+    fornecedores.forEach(f => map.set(f.id, f.nome))
+    return map
+  }, [fornecedores])
+
+  const catalogoPorId = React.useMemo(() => {
+    const map = new Map<number, ProdutoFornecedor>()
+    catalogo.forEach(prod => map.set(prod.id, prod))
+    return map
+  }, [catalogo])
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Novo Pedido de Compra</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-2">
+            <Label>Fornecedor</Label>
+            <div className="relative">
+              <Select value={typeof fornecedorId === 'number' ? String(fornecedorId) : undefined} onValueChange={handleFornecedorChange}>
+                <SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger>
+                <SelectContent>{fornecedores.map(f => (<SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>))}</SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
-        {catalogo.length>0 && (<div className="border rounded-xl p-2 max-h-48 overflow-auto">
-          <div className="text-sm mb-2 text-gray-500">Catálogo</div>
-          {catalogo.map((p)=>(<div key={p.id} className="flex items-center justify-between py-1">
-            <div className="text-sm">{p.nome} • {p.sku} • {brl.format(Number(p.preco ?? 0))}</div>
-            {isAdmin ? <Button variant="secondary" onClick={()=>addItem(p.id)}>Adicionar</Button> : <span className="text-xs text-gray-400">Sem permissão</span>}
-          </div>))}
-        </div>)}
-        {itens.length>0 && (<div className="border rounded-xl p-2">
-          <div className="text-sm mb-2 text-gray-500">Itens do pedido</div>
-          {itens.map((it,idx)=>(<div key={idx} className="flex items-center gap-2 py-1">
-            <span className="text-sm flex-1">ProdutoFornecedor #{it.produtoFornecedorId}</span>
-            <Input type="number" min={1} value={it.quantidade} onChange={e=>{ const q = Number(e.target.value)||1; setItens(prev=>prev.map((p,i)=>i===idx?{...p, quantidade:q}:p)) }} className="w-24"/>
-          </div>))}
-        </div>)}
-        {isAdmin ? <Button onClick={createPedido} className="w-full">Criar Pedido</Button> : <p className="text-xs text-gray-500">Clientes podem visualizar, mas não criar pedidos.</p>}
-      </CardContent>
-    </Card>
-    <Card className="rounded-2xl">
-      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Pedidos</CardTitle></CardHeader>
-      <CardContent className="p-0">
-        <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Fornecedor</TableHead><TableHead>Status</TableHead><TableHead className="w-56">Ações</TableHead></TableRow></TableHeader>
-        <TableBody>{pedidos.map((p:any)=>(<TableRow key={p.id}>
-          <TableCell>{p.id}</TableCell>
-          <TableCell>{p.fornecedorId}</TableCell>
-          <TableCell><Badge variant="default">{p.status}</Badge></TableCell>
-          <TableCell className="flex gap-2 py-2">
-            {isAdmin ? (<>
-              <Button variant="secondary" onClick={()=>setStatus(p.id,'APROVADO')}>Aprovar</Button>
-              <Button variant="secondary" onClick={()=>setStatus(p.id,'ENVIADO')}>Enviar</Button>
-              <Button variant="secondary" onClick={()=>receber(p.id)}>Receber</Button>
-            </>) : <span className="text-xs text-gray-400">Somente leitura</span>}
-          </TableCell>
-        </TableRow>))}</TableBody></Table>
-      </CardContent>
-    </Card>
-  </div>)
+          {catalogo.length>0 && (
+            <div className="border rounded-xl p-2 max-h-48 overflow-auto">
+              <div className="text-sm mb-2 text-gray-500">Catálogo</div>
+              {catalogo.map(p => (
+                <div key={p.id} className="flex items-center justify-between py-1">
+                  <div className="text-sm">{p.nome} • {p.sku} • {brl.format(Number(p.preco ?? 0))}</div>
+                  {isAdmin ? <Button variant="secondary" onClick={()=>addItem(p.id)}>Adicionar</Button> : <span className="text-xs text-gray-400">Sem permissão</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {itens.length>0 && (
+            <div className="border rounded-xl p-2 space-y-2">
+              <div className="text-sm text-gray-500">Itens do pedido</div>
+              {itens.map((it,idx)=>{
+                const prod = catalogoPorId.get(it.produtoFornecedorId)
+                return (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-sm flex-1">{prod ? `${prod.nome} (${prod.sku})` : `Produto #${it.produtoFornecedorId}`}</span>
+                    <Input type="number" min={1} value={it.quantidade} onChange={e=>{
+                      const q = Number(e.target.value) || 1
+                      setItens(prev=>prev.map((p,i)=>i===idx?{...p, quantidade:q}:p))
+                    }} className="w-24"/>
+                    <Button variant="ghost" size="sm" onClick={()=>removeItem(idx)}>Remover</Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {isAdmin ? <Button onClick={createPedido} className="w-full">Criar Pedido</Button> : <p className="text-xs text-gray-500">Clientes podem visualizar, mas não criar pedidos.</p>}
+        </CardContent>
+      </Card>
+      <Card className="rounded-2xl">
+        <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Pedidos</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead>Fornecedor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-64">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pedidos.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-6 text-center text-sm text-gray-500">Nenhum pedido cadastrado.</TableCell>
+                </TableRow>
+              ) : (
+                pedidos.map(p => (
+                  <TableRow key={p.id}>
+                    <TableCell>{p.id}</TableCell>
+                    <TableCell>{fornecedorPorId.get(p.fornecedorId) || p.fornecedorId}</TableCell>
+                    <TableCell><Badge variant="default">{p.status}</Badge></TableCell>
+                    <TableCell className="flex flex-wrap gap-2 py-2">
+                      {isAdmin ? (
+                        <>
+                          <Button variant="secondary" onClick={()=>atualizarStatus(p.id,'APROVADO')}>Aprovar</Button>
+                          <Button variant="secondary" onClick={()=>atualizarStatus(p.id,'ENVIADO')}>Enviar</Button>
+                          <Button variant="secondary" onClick={()=>receber(p.id)}>Receber</Button>
+                        </>
+                      ) : <span className="text-xs text-gray-400">Somente leitura</span>}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 
@@ -377,7 +815,6 @@ function AdminConsultasPage(){
           type="date"
 
           value={formatISODateForInput(editRow.data)}
-
           onChange={e=>{
             const iso = normalizeDateInputToISO(e.target.value)
             setEditRow({ ...editRow, data: iso })
@@ -419,9 +856,7 @@ function ClienteConsultasPage(){
     }
     load()
   },[user])
-
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
-
   const create = async()=>{
     if(!user) return
     if (!form.animalId) {
@@ -434,7 +869,6 @@ function ClienteConsultasPage(){
       return
     }
     const tipo = form.tipo.trim()
-
     const rawDate = form.data.trim()
     if (!tipo || !rawDate) {
       toast.error('Preencha todos os campos obrigatórios')
@@ -447,7 +881,6 @@ function ClienteConsultasPage(){
     }
     try{
       await Consultas.create({ clienteId:user.id, animalId, tipo, data: isoDate, observacoes: form.observacoes?.trim() || undefined })
-
       toast.success('Consulta agendada')
       setForm({animalId:'',tipo:'',data:'',observacoes:''})
       setList(await Consultas.listMine(user.id))
@@ -477,9 +910,7 @@ function ClienteConsultasPage(){
         </Select>
         {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
         <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
-
         <Input type="date" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
-
         <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
         <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
@@ -500,7 +931,6 @@ function ClienteConsultasPage(){
 
 function ClienteHistoricoPage(){
   const { user } = useAuth()
-
   const [list,setList]=useState<Consulta[]>([])
   React.useEffect(()=>{
     if(!user) return
