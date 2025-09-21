@@ -758,21 +758,6 @@ function PedidosPage(){
 }
 
 
-function RelatoriosPage(){
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Relatórios</CardTitle></CardHeader>
-      <CardContent>
-        <div className="grid md:grid-cols-3 gap-3">
-          <div className="p-4 rounded-2xl border bg-white"><div className="text-sm text-gray-500">Consultas futuras</div><div className="text-2xl font-semibold">—</div></div>
-          <div className="p-4 rounded-2xl border bg-white"><div className="text-sm text-gray-500">Pedidos em aberto</div><div className="text-2xl font-semibold">—</div></div>
-          <div className="p-4 rounded-2xl border bg-white"><div className="text-sm text-gray-500">Clientes ativos</div><div className="text-2xl font-semibold">—</div></div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 
 
 function AdminConsultasPage(){
@@ -1141,7 +1126,6 @@ function Home(){
             <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
             <TabsTrigger value="animais">Animais</TabsTrigger>
             <TabsTrigger value="clientes">Clientes</TabsTrigger>
-            <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
             <TabsTrigger value="consultas-admin">Consultas (agendadas)</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard"><DashboardPage/></TabsContent>
@@ -1149,7 +1133,6 @@ function Home(){
           <TabsContent value="fornecedores"><FornecedoresPage/></TabsContent>
           <TabsContent value="animais"><MeusAnimaisPage/></TabsContent>
           <TabsContent value="clientes"><ClientesPage/></TabsContent>
-          <TabsContent value="relatorios"><RelatoriosPage/></TabsContent>
           <TabsContent value="consultas-admin"><AdminConsultasPage/></TabsContent>
         </>) : (<>
           <TabsList className="grid grid-cols-4 lg:w-[780px]">
