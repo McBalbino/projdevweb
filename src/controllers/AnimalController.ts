@@ -99,7 +99,6 @@ export class AnimalController {
           especie: req.body.especie ?? a.especie,
           raca: req.body.raca ?? a.raca,
           idade: idadeProvided ? idadeValor ?? null : a.idade,
-
           clienteId: a.clienteId,
         };
     await a.update(patch);

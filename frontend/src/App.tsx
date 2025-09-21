@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { PawPrint, Users, Building2, Calendar, Search, LogOut, Shield } from 'lucide-react'
 import { Clients } from '@/api/clients'
 import { Animais } from '@/api/animais'
+import type { Animal } from '@/api/animais'
 import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
@@ -360,14 +361,56 @@ function AdminConsultasPage(){
 function ClienteConsultasPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
-  const [form,setForm]=useState<{animalId:number; tipo:string; data:string; observacoes?:string}>({animalId:0, tipo:'', data:'', observacoes:''})
-  React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[user])
+  const [form,setForm]=useState<{animalId:string; tipo:string; data:string; observacoes?:string}>({animalId:'', tipo:'', data:'', observacoes:''})
+  const [myAnimals, setMyAnimals] = useState<Animal[]>([])
+  React.useEffect(()=>{
+    if(!user) return
+    const load = async()=>{
+      try{
+        const [animals, consultas] = await Promise.all([
+          Animais.listMine(user.id),
+          Consultas.listMine(user.id)
+        ])
+        setMyAnimals(animals)
+        setList(consultas)
+      }catch(e){
+        console.error('Erro ao carregar dados de consultas:', e)
+        toast.error('Falha ao carregar consultas')
+      }
+    }
+    load()
+  },[user])
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
   const create = async()=>{
     if(!user) return
-    if (!form.animalId || !form.tipo || !form.data) return toast.error('Preencha todos os campos')
-    await Consultas.create({ clienteId:user.id, animalId:Number(form.animalId), tipo:form.tipo, data:new Date(form.data).toISOString(), observacoes: form.observacoes })
-    toast.success('Consulta agendada'); setForm({animalId:0,tipo:'',data:'',observacoes:''}); setList(await Consultas.listMine(user.id))
+    if (!form.animalId) {
+      toast.error('Selecione um animal')
+      return
+    }
+    const animalId = Number(form.animalId)
+    if (!Number.isFinite(animalId) || animalId <= 0) {
+      toast.error('Selecione um animal válido')
+      return
+    }
+    const tipo = form.tipo.trim()
+    if (!tipo || !form.data) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+    const quando = new Date(form.data)
+    if (Number.isNaN(quando.getTime())) {
+      toast.error('Informe uma data e horário válidos')
+      return
+    }
+    try{
+      await Consultas.create({ clienteId:user.id, animalId, tipo, data:quando.toISOString(), observacoes: form.observacoes?.trim() || undefined })
+      toast.success('Consulta agendada')
+      setForm({animalId:'',tipo:'',data:'',observacoes:''})
+      setList(await Consultas.listMine(user.id))
+    }catch(e:any){
+      console.error('Erro ao agendar consulta:', e)
+      toast.error(e?.response?.data?.erro || e?.response?.data?.message || e?.message || 'Falha ao agendar consulta')
+    }
   }
   const remove = async(id:number)=>{ if(!user) return; await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.listMine(user.id)) }
   const add1h = async(id:number, oldISO:string)=>{ if(!user) return; const next = new Date(new Date(oldISO).getTime()+3600000).toISOString(); await Consultas.update(id, { data: next }); toast.success('Consulta reagendada'); setList(await Consultas.listMine(user.id)) }
@@ -376,11 +419,23 @@ function ClienteConsultasPage(){
     <Card className="rounded-2xl">
       <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Agendar Consulta</CardTitle></CardHeader>
       <CardContent className="space-y-2">
-        <Input type="number" placeholder="ID do meu Animal" value={form.animalId||''} onChange={e=>setForm({...form, animalId:Number(e.target.value)||0})}/>
-        <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm({...form, tipo:e.target.value})}/>
-        <Input type="datetime-local" value={form.data} onChange={e=>setForm({...form, data:e.target.value})}/>
-        <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm({...form, observacoes:e.target.value})}/>
-        <Button className="w-full" onClick={create}>Agendar</Button>
+        <Select value={form.animalId} onValueChange={(value)=>setForm(prev=>({...prev, animalId:value}))} disabled={!myAnimals.length}>
+          <SelectTrigger>
+            <SelectValue placeholder={myAnimals.length ? 'Selecione um dos meus animais' : 'Cadastre um animal primeiro'} />
+          </SelectTrigger>
+          <SelectContent>
+            {myAnimals.map((animal)=>(
+              <SelectItem key={animal.id} value={String(animal.id)}>
+                {animal.nome} • {animal.especie} ({animal.raca})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
+        <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
+        <Input type="datetime-local" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+        <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
+        <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
     </Card>
     <Card className="rounded-2xl">
