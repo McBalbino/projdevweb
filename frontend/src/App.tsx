@@ -496,6 +496,7 @@ function MeusAnimaisPage(){
               <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
+
               {list.map((a:any)=>{
                 const isEditingRow = editing?.id === a.id
                 return (
@@ -516,6 +517,7 @@ function MeusAnimaisPage(){
                   </TableRow>
                 )
               })}
+
             </TableBody>
           </Table>
         </CardContent>
