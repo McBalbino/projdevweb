@@ -185,17 +185,21 @@ function AnimaisPage(){
               <TableHead>ID</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Espécie</TableHead>
+              <TableHead>Raça</TableHead>
+              <TableHead>Idade</TableHead>
               <TableHead>Cliente</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {list
-              .filter(a => `${a.nome} ${a.especie}`.toLowerCase().includes(q.toLowerCase()))
+              .filter(a => `${a.nome} ${a.especie} ${a.raca}`.toLowerCase().includes(q.toLowerCase()))
               .map((a:any)=>(
                 <TableRow key={a.id}>
                   <TableCell>{a.id}</TableCell>
                   <TableCell className="font-medium">{a.nome}</TableCell>
                   <TableCell className="capitalize">{a.especie}</TableCell>
+                  <TableCell className="capitalize">{a.raca}</TableCell>
+                  <TableCell>{a.idade ?? '—'}</TableCell>
                   <TableCell>{a.clienteId}</TableCell>
                 </TableRow>
               ))}
@@ -413,8 +417,8 @@ function ClienteHistoricoPage(){
 function MeusAnimaisPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
-  const [form,setForm]=useState<{nome:string; especie:string}>({nome:'', especie:''})
-  const [editing,setEditing]=useState<any|null>(null)
+  const [form,setForm]=useState<{nome:string; especie:string; raca:string; idade:string}>({nome:'', especie:'', raca:'', idade:''})
+  const [editing,setEditing]=useState<{id:number; nome:string; especie:string; raca:string; idade:string} | null>(null)
 
   const load = async()=>{
     if(!user) return;
@@ -425,14 +429,47 @@ function MeusAnimaisPage(){
 
   const create = async()=>{
     if(!user) return
-    if(!form.nome || !form.especie) return toast.error('Informe nome e espécie')
-    await Animais.create({ nome: form.nome, especie: form.especie, clienteId: user.id })
-    setForm({nome:'', especie:''}); toast.success('Animal cadastrado!'); await load()
+    if(!form.nome || !form.especie || !form.raca) return toast.error('Informe nome, espécie e raça')
+    let idadeNumero: number | undefined
+    if (form.idade !== '') {
+      const parsed = Number(form.idade)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error('Idade inválida')
+        return
+      }
+      idadeNumero = Math.floor(parsed)
+    }
+    await Animais.create({
+      nome: form.nome,
+      especie: form.especie,
+      raca: form.raca,
+      clienteId: user.id,
+      ...(form.idade !== '' ? { idade: idadeNumero } : {}),
+    })
+    setForm({nome:'', especie:'', raca:'', idade:''}); toast.success('Animal cadastrado!'); await load()
   }
 
   const save = async()=>{
     if(!editing) return
-    await Animais.update(editing.id, { nome: editing.nome, especie: editing.especie })
+    if(!editing.nome || !editing.especie || !editing.raca) {
+      toast.error('Informe nome, espécie e raça')
+      return
+    }
+    let idadeNumero: number | null = null
+    if (editing.idade !== '') {
+      const parsed = Number(editing.idade)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error('Idade inválida')
+        return
+      }
+      idadeNumero = Math.floor(parsed)
+    }
+    await Animais.update(editing.id, {
+      nome: editing.nome,
+      especie: editing.especie,
+      raca: editing.raca,
+      idade: editing.idade === '' ? null : idadeNumero,
+    })
     setEditing(null); toast.success('Animal atualizado!'); await load()
   }
 
@@ -445,6 +482,8 @@ function MeusAnimaisPage(){
         <CardContent className="space-y-2">
           <Input placeholder="Nome" value={form.nome} onChange={e=>setForm({...form, nome:e.target.value})}/>
           <Input placeholder="Espécie (ex.: cachorro, gato)" value={form.especie} onChange={e=>setForm({...form, especie:e.target.value})}/>
+          <Input placeholder="Raça" value={form.raca} onChange={e=>setForm({...form, raca:e.target.value})}/>
+          <Input type="number" min={0} placeholder="Idade (opcional)" value={form.idade} onChange={e=>setForm({...form, idade:e.target.value})}/>
           <Button className="w-full" onClick={create}>Salvar</Button>
         </CardContent>
       </Card>
@@ -454,19 +493,21 @@ function MeusAnimaisPage(){
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
+              <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
               {list.map((a:any)=>(
                 <TableRow key={a.id}>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.nome} onChange={e=>setEditing({...editing, nome:e.target.value})}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.especie} onChange={e=>setEditing({...editing, especie:e.target.value})}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
+                  <TableCell>{editing?.id===a.id ? <Input value={editing.nome} onChange={e=>setEditing(prev=>prev?{...prev, nome:e.target.value}:prev)}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
+                  <TableCell>{editing?.id===a.id ? <Input value={editing.especie} onChange={e=>setEditing(prev=>prev?{...prev, especie:e.target.value}:prev)}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
+                  <TableCell>{editing?.id===a.id ? <Input value={editing.raca} onChange={e=>setEditing(prev=>prev?{...prev, raca:e.target.value}:prev)}/> : <span className="capitalize">{a.raca}</span>}</TableCell>
+                  <TableCell>{editing?.id===a.id ? <Input type="number" min={0} value={editing.idade} onChange={e=>setEditing(prev=>prev?{...prev, idade:e.target.value}:prev)}/> : <span>{a.idade ?? '—'}</span>}</TableCell>
                   <TableCell className="flex gap-2">
                     {editing?.id===a.id ? (<>
                       <Button size="sm" onClick={save}>Salvar</Button>
                       <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
                     </>) : (<>
-                      <Button size="sm" variant="secondary" onClick={()=>setEditing(a)}>Editar</Button>
+                      <Button size="sm" variant="secondary" onClick={()=>setEditing({ id:a.id, nome:a.nome, especie:a.especie, raca:a.raca, idade:a.idade!=null?String(a.idade):'' })}>Editar</Button>
                       <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
                     </>)}
                   </TableCell>

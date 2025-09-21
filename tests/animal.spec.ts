@@ -9,6 +9,7 @@ describe('Model: Animal', () => {
     const a = await Animal.create({
       nome: 'Rex',
       especie: 'Cachorro',
+      raca: 'Vira-lata',
       clienteId: dono.id,
     });
     expect(a.id).to.be.a('number');
@@ -21,6 +22,7 @@ describe('Model: Animal', () => {
     try {
       await Animal.create({
         especie: 'Gato',
+        raca: 'Sphynx',
         clienteId: dono.id,
       } as any);
     } catch (e) {
@@ -32,15 +34,15 @@ describe('Model: Animal', () => {
 
   it('3) deve listar animais por cliente (findAll com where)', async () => {
     const dono = await Client.create({ nome: 'Dono4', telefone: '44', email: 'd4@x.com', senha: 'x' });
-    await Animal.create({ nome: 'A1', especie: 'Ave', clienteId: dono.id });
-    await Animal.create({ nome: 'A2', especie: 'Ave', clienteId: dono.id });
+    await Animal.create({ nome: 'A1', especie: 'Ave', raca: 'Calopsita', clienteId: dono.id });
+    await Animal.create({ nome: 'A2', especie: 'Ave', raca: 'Calopsita', clienteId: dono.id });
     const lista = await Animal.findAll({ where: { clienteId: dono.id } });
     expect(lista.length).to.equal(2);
   });
 
   it('4) deve deletar animal', async () => {
     const dono = await Client.create({ nome: 'Dono5', telefone: '55', email: 'd5@x.com', senha: 'x' });
-    const a = await Animal.create({ nome: 'Bolt', especie: 'Cachorro', clienteId: dono.id });
+    const a = await Animal.create({ nome: 'Bolt', especie: 'Cachorro', raca: 'Border Collie', clienteId: dono.id });
     await Animal.destroy({ where: { id: a.id } });
     const gone = await Animal.findByPk(a.id);
     expect(gone).to.be.null;
