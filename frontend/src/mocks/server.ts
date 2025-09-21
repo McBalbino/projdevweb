@@ -4,7 +4,7 @@ import type { AxiosInstance } from "axios"
 
 type User = { id:number; nome:string; email:string; senha:string; telefone?:string; tipo:'admin'|'cliente' }
 type Client = { id:number; nome:string; email:string; telefone:string; tipo:'cliente' }
-type Animal = { id:number; nome:string; especie:'cachorro'|'gato'|'outro'; clienteId:number }
+type Animal = { id:number; nome:string; especie:string; raca:string; idade:number|null; clienteId:number }
 type Fornecedor = { id:number; nome:string; cnpj:string; email?:string; telefone?:string; endereco?:string }
 type ProdutoFornecedor = { id:number; fornecedorId:number; nome:string; sku:string; preco:number; ativo:boolean }
 type StatusPedido = 'ABERTO'|'APROVADO'|'ENVIADO'|'RECEBIDO'|'CANCELADO'
@@ -26,8 +26,8 @@ const clients: Client[] = [
   { id: nextId(), nome: "Bruno Souza", email: "bruno@exemplo.com", telefone: "(83) 9 9999-0002", tipo:'cliente' },
 ]
 const animais: Animal[] = [
-  { id: nextId(), nome: 'Rex', especie: 'cachorro', clienteId: 2 },
-  { id: nextId(), nome: 'Mimi', especie: 'gato', clienteId: 2 },
+  { id: nextId(), nome: 'Rex', especie: 'cachorro', raca: 'vira-lata', idade: 4, clienteId: 2 },
+  { id: nextId(), nome: 'Mimi', especie: 'gato', raca: 'siamês', idade: 2, clienteId: 2 },
 ]
 
 const consultas: Consulta[] = [
@@ -48,8 +48,8 @@ const pedidos: PedidoCompra[] = []
 const pedidoItens: PedidoCompraItem[] = []
 
 function parseBody(data:any){ try { return typeof data === 'string' ? JSON.parse(data) : data } catch { return {} } }
-function ok(data:any, status=200){ return [status, data] as const }
-function err(message:string, status=400){ return [status, { message }] as const }
+function ok<T>(data:T, status=200): [number, T]{ return [status, data] }
+function err(message:string, status=400): [number, { message: string }]{ return [status, { message }] }
 
 export function enableMock(api: AxiosInstance){
   const mock = new AxiosMockAdapter(api, { delayResponse: 300 })
