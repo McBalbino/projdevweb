@@ -18,6 +18,20 @@ const parseIdade = (raw: unknown): ParsedIdade => {
 };
 
 export class AnimalController {
+  private parseIdade(raw: unknown): { value: number | null } | { error: string } {
+    if (raw === undefined) {
+      return { value: null };
+    }
+    if (raw === null || raw === '') {
+      return { value: null };
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return { error: 'Idade deve ser um número inteiro não negativo' };
+    }
+    return { value: Math.floor(parsed) };
+  }
+
   async create(req: Request, res: Response) {
     const usuario: any = (req as any).usuario;
     const idadeParse = parseIdade(req.body.idade);

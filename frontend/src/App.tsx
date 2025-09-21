@@ -35,6 +35,22 @@ const normalizeDateInputToISO = (value: string) => {
   return parsed.toISOString()
 }
 
+const formatDateInputValue = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
+
+const normalizeDateInputToISO = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const base = trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`
+  const parsed = new Date(base)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString()
+}
+
 function AppShell(){ const { user, logout } = useAuth(); return (
   <div className="flex items-center justify-between mb-6">
     <div>
@@ -415,7 +431,9 @@ function ClienteConsultasPage(){
     }
     load()
   },[user])
+
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+
   const create = async()=>{
     if(!user) return
     if (!form.animalId) {
@@ -428,6 +446,7 @@ function ClienteConsultasPage(){
       return
     }
     const tipo = form.tipo.trim()
+
     const rawDate = form.data.trim()
     if (!tipo || !rawDate) {
       toast.error('Preencha todos os campos obrigatórios')
@@ -440,6 +459,7 @@ function ClienteConsultasPage(){
     }
     try{
       await Consultas.create({ clienteId:user.id, animalId, tipo, data: isoDate, observacoes: form.observacoes?.trim() || undefined })
+
       toast.success('Consulta agendada')
       setForm({animalId:'',tipo:'',data:'',observacoes:''})
       setList(await Consultas.listMine(user.id))
@@ -469,7 +489,9 @@ function ClienteConsultasPage(){
         </Select>
         {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
         <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
+
         <Input type="date" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+
         <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
         <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
@@ -490,6 +512,7 @@ function ClienteConsultasPage(){
 
 function ClienteHistoricoPage(){
   const { user } = useAuth()
+
   const [list,setList]=useState<Consulta[]>([])
   React.useEffect(()=>{
     if(!user) return
@@ -507,6 +530,7 @@ function ClienteHistoricoPage(){
   }
   const futuras = list.filter(isFutureAgendada)
   const historico = list.filter(c => !isFutureAgendada(c))
+
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
   const renderRows = (items: Consulta[], prefix: 'future'|'past') => items.map((c)=>{
     const parsed = new Date(c.data)
@@ -658,6 +682,7 @@ function MeusAnimaisPage(){
               <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
+
               {list.map((a:any)=>{
                 const isEditingRow = editing?.id === a.id
                 return (
@@ -678,6 +703,7 @@ function MeusAnimaisPage(){
                   </TableRow>
                 )
               })}
+
             </TableBody>
           </Table>
         </CardContent>
