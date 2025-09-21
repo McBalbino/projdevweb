@@ -13,9 +13,26 @@ import { Badge } from '@/components/ui/badge'
 import { PawPrint, Users, Building2, Calendar, Search, LogOut, Shield } from 'lucide-react'
 import { Clients } from '@/api/clients'
 import { Animais } from '@/api/animais'
+import type { Animal } from '@/api/animais'
 import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
+
+const formatDateInputValue = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
+
+const normalizeDateInputToISO = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const base = trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`
+  const parsed = new Date(base)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString()
+}
 
 function AppShell(){ const { user, logout } = useAuth(); return (
   <div className="flex items-center justify-between mb-6">
@@ -53,7 +70,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       await login(email, senha)
       toast.success('Bem-vindo(a)!')
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || e?.message || 'Falha no login')
+      toast.error(e?.response?.data?.message || e?.response?.data?.erro || e?.message || 'Falha no login')
     } finally {
       setLoading(false)
     }
@@ -185,17 +202,21 @@ function AnimaisPage(){
               <TableHead>ID</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Espécie</TableHead>
+              <TableHead>Raça</TableHead>
+              <TableHead>Idade</TableHead>
               <TableHead>Cliente</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {list
-              .filter(a => `${a.nome} ${a.especie}`.toLowerCase().includes(q.toLowerCase()))
+              .filter(a => `${a.nome} ${a.especie} ${a.raca}`.toLowerCase().includes(q.toLowerCase()))
               .map((a:any)=>(
                 <TableRow key={a.id}>
                   <TableCell>{a.id}</TableCell>
                   <TableCell className="font-medium">{a.nome}</TableCell>
                   <TableCell className="capitalize">{a.especie}</TableCell>
+                  <TableCell className="capitalize">{a.raca}</TableCell>
+                  <TableCell>{a.idade ?? '—'}</TableCell>
                   <TableCell>{a.clienteId}</TableCell>
                 </TableRow>
               ))}
@@ -317,8 +338,19 @@ function AdminConsultasPage(){
   const [list,setList]=useState<any[]>([])
   const [editRow,setEditRow]=useState<any|null>(null)
   React.useEffect(()=>{ Consultas.list().then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
-  const save = async()=>{ if(!editRow) return; await Consultas.update(editRow.id, editRow); toast.success('Consulta atualizada'); setEditRow(null); setList(await Consultas.list()) }
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+  const save = async()=>{
+    if(!editRow) return
+    const tipo = (editRow.tipo || '').trim()
+    if (!tipo || !editRow.data) {
+      toast.error('Preencha tipo e data')
+      return
+    }
+    await Consultas.update(editRow.id, { ...editRow, tipo })
+    toast.success('Consulta atualizada')
+    setEditRow(null)
+    setList(await Consultas.list())
+  }
   const remove = async(id:number)=>{ await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.list()) }
   const setStatus = async(id:number, status:'AGENDADA'|'CONCLUIDA'|'CANCELADA')=>{ await Consultas.update(id, { status }); toast.success('Status atualizado'); setList(await Consultas.list()) }
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
@@ -338,7 +370,14 @@ function AdminConsultasPage(){
       </TableRow>))}</TableBody></Table>
       {editRow && <div className="p-4 border-t grid md:grid-cols-5 gap-2">
         <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
-        <Input type="datetime-local" value={editRow.data.slice(0,16)} onChange={e=>setEditRow({...editRow, data:new Date(e.target.value).toISOString()})}/>
+        <Input
+          type="date"
+          value={formatDateInputValue(editRow.data)}
+          onChange={e=>{
+            const iso = normalizeDateInputToISO(e.target.value)
+            setEditRow({ ...editRow, data: iso })
+          }}
+        />
         <Input value={editRow.observacoes||''} onChange={e=>setEditRow({...editRow, observacoes:e.target.value})} placeholder="Observações"/>
         <Select value={editRow.status} onValueChange={(v:any)=>setEditRow({...editRow, status:v})}>
           <SelectTrigger><SelectValue placeholder="Status"/></SelectTrigger>
@@ -356,14 +395,57 @@ function AdminConsultasPage(){
 function ClienteConsultasPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
-  const [form,setForm]=useState<{animalId:number; tipo:string; data:string; observacoes?:string}>({animalId:0, tipo:'', data:'', observacoes:''})
-  React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[user])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const [form,setForm]=useState<{animalId:string; tipo:string; data:string; observacoes?:string}>({animalId:'', tipo:'', data:'', observacoes:''})
+  const [myAnimals, setMyAnimals] = useState<Animal[]>([])
+  React.useEffect(()=>{
+    if(!user) return
+    const load = async()=>{
+      try{
+        const [animals, consultas] = await Promise.all([
+          Animais.listMine(user.id),
+          Consultas.listMine(user.id)
+        ])
+        setMyAnimals(animals)
+        setList(consultas)
+      }catch(e){
+        console.error('Erro ao carregar dados de consultas:', e)
+        toast.error('Falha ao carregar consultas')
+      }
+    }
+    load()
+  },[user])
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
   const create = async()=>{
     if(!user) return
-    if (!form.animalId || !form.tipo || !form.data) return toast.error('Preencha todos os campos')
-    await Consultas.create({ clienteId:user.id, animalId:Number(form.animalId), tipo:form.tipo, data:new Date(form.data).toISOString(), observacoes: form.observacoes })
-    toast.success('Consulta agendada'); setForm({animalId:0,tipo:'',data:'',observacoes:''}); setList(await Consultas.listMine(user.id))
+    if (!form.animalId) {
+      toast.error('Selecione um animal')
+      return
+    }
+    const animalId = Number(form.animalId)
+    if (!Number.isFinite(animalId) || animalId <= 0) {
+      toast.error('Selecione um animal válido')
+      return
+    }
+    const tipo = form.tipo.trim()
+    const rawDate = form.data.trim()
+    if (!tipo || !rawDate) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+    const isoDate = normalizeDateInputToISO(rawDate)
+    if (!isoDate) {
+      toast.error('Informe uma data válida')
+      return
+    }
+    try{
+      await Consultas.create({ clienteId:user.id, animalId, tipo, data: isoDate, observacoes: form.observacoes?.trim() || undefined })
+      toast.success('Consulta agendada')
+      setForm({animalId:'',tipo:'',data:'',observacoes:''})
+      setList(await Consultas.listMine(user.id))
+    }catch(e:any){
+      console.error('Erro ao agendar consulta:', e)
+      toast.error(e?.response?.data?.erro || e?.response?.data?.message || e?.message || 'Falha ao agendar consulta')
+    }
   }
   const remove = async(id:number)=>{ if(!user) return; await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.listMine(user.id)) }
   const add1h = async(id:number, oldISO:string)=>{ if(!user) return; const next = new Date(new Date(oldISO).getTime()+3600000).toISOString(); await Consultas.update(id, { data: next }); toast.success('Consulta reagendada'); setList(await Consultas.listMine(user.id)) }
@@ -372,11 +454,23 @@ function ClienteConsultasPage(){
     <Card className="rounded-2xl">
       <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Agendar Consulta</CardTitle></CardHeader>
       <CardContent className="space-y-2">
-        <Input type="number" placeholder="ID do meu Animal" value={form.animalId||''} onChange={e=>setForm({...form, animalId:Number(e.target.value)||0})}/>
-        <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm({...form, tipo:e.target.value})}/>
-        <Input type="datetime-local" value={form.data} onChange={e=>setForm({...form, data:e.target.value})}/>
-        <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm({...form, observacoes:e.target.value})}/>
-        <Button className="w-full" onClick={create}>Agendar</Button>
+        <Select value={form.animalId} onValueChange={(value)=>setForm(prev=>({...prev, animalId:value}))} disabled={!myAnimals.length}>
+          <SelectTrigger>
+            <SelectValue placeholder={myAnimals.length ? 'Selecione um dos meus animais' : 'Cadastre um animal primeiro'} />
+          </SelectTrigger>
+          <SelectContent>
+            {myAnimals.map((animal)=>(
+              <SelectItem key={animal.id} value={String(animal.id)}>
+                {animal.nome} • {animal.especie} ({animal.raca})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
+        <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
+        <Input type="date" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+        <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
+        <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
     </Card>
     <Card className="rounded-2xl">
@@ -397,7 +491,7 @@ function ClienteHistoricoPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
   React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar histórico')) },[user])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
   const passado = list.filter((c:any)=> new Date(c.data).getTime() < Date.now())
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
   return (<Card className="rounded-2xl">
@@ -413,22 +507,59 @@ function ClienteHistoricoPage(){
 function MeusAnimaisPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
-  const [form,setForm]=useState<{nome:string; especie:string}>({nome:'', especie:''})
-  const [editing,setEditing]=useState<any|null>(null)
+  const [form,setForm]=useState<{nome:string; especie:string; raca:string; idade:string}>({nome:'', especie:'', raca:'', idade:''})
+  const [editing,setEditing]=useState<{id:number; nome:string; especie:string; raca:string; idade:string} | null>(null)
 
-  const load = async()=>{ if(!user) return; setList(await Animais.listMine(user.id)) }
+  const load = async()=>{
+    if(!user) return;
+    const data = user.tipo === 'admin' ? await Animais.list() : await Animais.listMine(user.id)
+    setList(data)
+  }
   React.useEffect(()=>{ load().catch(()=>toast.error('Falha ao carregar meus animais')) },[user])
 
   const create = async()=>{
     if(!user) return
-    if(!form.nome || !form.especie) return toast.error('Informe nome e espécie')
-    await Animais.create({ nome: form.nome, especie: form.especie, clienteId: user.id })
-    setForm({nome:'', especie:''}); toast.success('Animal cadastrado!'); await load()
+    if(!form.nome || !form.especie || !form.raca) return toast.error('Informe nome, espécie e raça')
+    let idadeNumero: number | undefined
+    if (form.idade !== '') {
+      const parsed = Number(form.idade)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error('Idade inválida')
+        return
+      }
+      idadeNumero = Math.floor(parsed)
+    }
+    await Animais.create({
+      nome: form.nome,
+      especie: form.especie,
+      raca: form.raca,
+      clienteId: user.id,
+      ...(form.idade !== '' ? { idade: idadeNumero } : {}),
+    })
+    setForm({nome:'', especie:'', raca:'', idade:''}); toast.success('Animal cadastrado!'); await load()
   }
 
   const save = async()=>{
     if(!editing) return
-    await Animais.update(editing.id, { nome: editing.nome, especie: editing.especie })
+    if(!editing.nome || !editing.especie || !editing.raca) {
+      toast.error('Informe nome, espécie e raça')
+      return
+    }
+    let idadeNumero: number | null = null
+    if (editing.idade !== '') {
+      const parsed = Number(editing.idade)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.error('Idade inválida')
+        return
+      }
+      idadeNumero = Math.floor(parsed)
+    }
+    await Animais.update(editing.id, {
+      nome: editing.nome,
+      especie: editing.especie,
+      raca: editing.raca,
+      idade: editing.idade === '' ? null : idadeNumero,
+    })
     setEditing(null); toast.success('Animal atualizado!'); await load()
   }
 
@@ -441,6 +572,8 @@ function MeusAnimaisPage(){
         <CardContent className="space-y-2">
           <Input placeholder="Nome" value={form.nome} onChange={e=>setForm({...form, nome:e.target.value})}/>
           <Input placeholder="Espécie (ex.: cachorro, gato)" value={form.especie} onChange={e=>setForm({...form, especie:e.target.value})}/>
+          <Input placeholder="Raça" value={form.raca} onChange={e=>setForm({...form, raca:e.target.value})}/>
+          <Input type="number" min={0} placeholder="Idade (opcional)" value={form.idade} onChange={e=>setForm({...form, idade:e.target.value})}/>
           <Button className="w-full" onClick={create}>Salvar</Button>
         </CardContent>
       </Card>
@@ -450,24 +583,29 @@ function MeusAnimaisPage(){
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
+              <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((a:any)=>(
-                <TableRow key={a.id}>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.nome} onChange={e=>setEditing({...editing, nome:e.target.value})}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.especie} onChange={e=>setEditing({...editing, especie:e.target.value})}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
-                  <TableCell className="flex gap-2">
-                    {editing?.id===a.id ? (<>
-                      <Button size="sm" onClick={save}>Salvar</Button>
-                      <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
-                    </>) : (<>
-                      <Button size="sm" variant="secondary" onClick={()=>setEditing(a)}>Editar</Button>
-                      <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
-                    </>)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {list.map((a:any)=>{
+                const isEditingRow = editing?.id === a.id
+                return (
+                  <TableRow key={a.id}>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.nome} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, nome:e.target.value}:prev)}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.especie} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, especie:e.target.value}:prev)}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.raca} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, raca:e.target.value}:prev)}/> : <span className="capitalize">{a.raca}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input type="number" min={0} value={editing.idade} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, idade:e.target.value}:prev)}/> : <span>{a.idade ?? '—'}</span>}</TableCell>
+                    <TableCell className="flex gap-2">
+                      {isEditingRow ? (<>
+                        <Button size="sm" onClick={save}>Salvar</Button>
+                        <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
+                      </>) : (<>
+                        <Button size="sm" variant="secondary" onClick={()=>setEditing({ id:a.id, nome:a.nome, especie:a.especie, raca:a.raca, idade:a.idade!=null?String(a.idade):'' })}>Editar</Button>
+                        <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
+                      </>)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
