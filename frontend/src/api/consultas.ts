@@ -14,7 +14,7 @@ export type Consulta = {
 
 export const Consultas = {
   list: () => api.get<Consulta[]>('/consultas').then(r=>r.data),
-  listMine: (clienteId:number) => api.get<Consulta[]>('/consultas').then(r=>r.data.filter(c=>c.clienteId===clienteId)),
+  listMine: (_clienteId?:number) => api.get<Consulta[]>('/consultas/minhas').then(r=>r.data),
   create: (c: Omit<Consulta,'id'|'status'> & { status?: ConsultaStatus }) => api.post<Consulta>('/consultas', { status:'AGENDADA', ...c }).then(r=>r.data),
   update: (id:number, patch: Partial<Consulta>) => api.put<Consulta>(`/consultas/${id}`, patch).then(r=>r.data),
   remove: (id:number) => api.delete(`/consultas/${id}`).then(r=>r.data),
