@@ -1,6 +1,23 @@
 import { Request, Response } from 'express';
 import { Animal, AnimalCreationAttributes } from '../models/Animal';
 
+type ParsedIdade = { value: number | null } | { error: string };
+
+const parseIdade = (raw: unknown): ParsedIdade => {
+  if (raw === undefined) {
+    return { value: null };
+  }
+  if (raw === null || raw === '') {
+    return { value: null };
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return { error: 'Idade deve ser um número inteiro não negativo' };
+  }
+  return { value: Math.floor(parsed) };
+};
+
+
 export class AnimalController {
   private parseIdade(raw: unknown): { value: number | null } | { error: string } {
     if (raw === undefined) {
@@ -18,8 +35,8 @@ export class AnimalController {
 
   async create(req: Request, res: Response) {
     const usuario: any = (req as any).usuario;
+    const idadeParse = parseIdade(req.body.idade);
 
-    const idadeParse = this.parseIdade(req.body.idade);
     if ('error' in idadeParse) {
       return res.status(400).json({ erro: idadeParse.error });
     }
@@ -65,7 +82,8 @@ export class AnimalController {
     const idadeProvided = Object.prototype.hasOwnProperty.call(req.body, 'idade');
     let idadeValor: number | null | undefined;
     if (idadeProvided) {
-      const idadeParse = this.parseIdade(req.body.idade);
+      const idadeParse = parseIdade(req.body.idade);
+
       if ('error' in idadeParse) {
         return res.status(400).json({ erro: idadeParse.error });
       }
