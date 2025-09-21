@@ -19,7 +19,9 @@ import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
 import type { Consulta } from '@/api/consultas'
 
+
 const formatISODateForInput = (value?: string) => {
+
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
@@ -373,7 +375,9 @@ function AdminConsultasPage(){
         <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
         <Input
           type="date"
+
           value={formatISODateForInput(editRow.data)}
+
           onChange={e=>{
             const iso = normalizeDateInputToISO(e.target.value)
             setEditRow({ ...editRow, data: iso })
@@ -415,7 +419,9 @@ function ClienteConsultasPage(){
     }
     load()
   },[user])
+
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+
   const create = async()=>{
     if(!user) return
     if (!form.animalId) {
@@ -428,6 +434,7 @@ function ClienteConsultasPage(){
       return
     }
     const tipo = form.tipo.trim()
+
     const rawDate = form.data.trim()
     if (!tipo || !rawDate) {
       toast.error('Preencha todos os campos obrigatórios')
@@ -440,6 +447,7 @@ function ClienteConsultasPage(){
     }
     try{
       await Consultas.create({ clienteId:user.id, animalId, tipo, data: isoDate, observacoes: form.observacoes?.trim() || undefined })
+
       toast.success('Consulta agendada')
       setForm({animalId:'',tipo:'',data:'',observacoes:''})
       setList(await Consultas.listMine(user.id))
@@ -469,7 +477,9 @@ function ClienteConsultasPage(){
         </Select>
         {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
         <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
+
         <Input type="date" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+
         <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
         <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
@@ -490,6 +500,7 @@ function ClienteConsultasPage(){
 
 function ClienteHistoricoPage(){
   const { user } = useAuth()
+
   const [list,setList]=useState<Consulta[]>([])
   React.useEffect(()=>{
     if(!user) return
