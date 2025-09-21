@@ -14,6 +14,7 @@ import { PawPrint, Users, Building2, Calendar, Search, LogOut, Shield } from 'lu
 import { Clients } from '@/api/clients'
 import { Animais } from '@/api/animais'
 import type { Animal } from '@/api/animais'
+
 import { Fornecedores } from '@/api/fornecedores'
 import type { Fornecedor, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos } from '@/api/pedidos'
@@ -23,6 +24,7 @@ import type { Consulta } from '@/api/consultas'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 const formatISODateForInput = (value?: string) => {
+
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
@@ -811,6 +813,7 @@ function AdminConsultasPage(){
         <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
         <Input
           type="date"
+
           value={formatISODateForInput(editRow.data)}
           onChange={e=>{
             const iso = normalizeDateInputToISO(e.target.value)
