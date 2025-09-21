@@ -18,6 +18,7 @@ export class AnimalController {
 
   async create(req: Request, res: Response) {
     const usuario: any = (req as any).usuario;
+
     const idadeParse = this.parseIdade(req.body.idade);
     if ('error' in idadeParse) {
       return res.status(400).json({ erro: idadeParse.error });
@@ -60,6 +61,7 @@ export class AnimalController {
     if (usuario?.tipo !== 'admin' && a.clienteId !== Number(usuario.id)) {
       return res.status(403).json({ erro: 'Sem permissão para alterar este animal' });
     }
+
     const idadeProvided = Object.prototype.hasOwnProperty.call(req.body, 'idade');
     let idadeValor: number | null | undefined;
     if (idadeProvided) {
@@ -79,6 +81,7 @@ export class AnimalController {
           especie: req.body.especie ?? a.especie,
           raca: req.body.raca ?? a.raca,
           idade: idadeProvided ? idadeValor ?? null : a.idade,
+
           clienteId: a.clienteId,
         };
     await a.update(patch);
