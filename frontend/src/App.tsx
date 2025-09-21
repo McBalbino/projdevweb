@@ -17,6 +17,23 @@ import type { Animal } from '@/api/animais'
 import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
+import type { Consulta } from '@/api/consultas'
+
+const formatDateInputValue = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
+
+const normalizeDateInputToISO = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const base = trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`
+  const parsed = new Date(base)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString()
+}
 
 const formatDateInputValue = (value?: string) => {
   if (!value) return ''
@@ -495,18 +512,91 @@ function ClienteConsultasPage(){
 
 function ClienteHistoricoPage(){
   const { user } = useAuth()
-  const [list,setList]=useState<any[]>([])
-  React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar histórico')) },[user])
+
+  const [list,setList]=useState<Consulta[]>([])
+  React.useEffect(()=>{
+    if(!user) return
+    Consultas.listMine(user.id)
+      .then(setList)
+      .catch(()=>toast.error('Falha ao carregar histórico'))
+  },[user])
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
-  const passado = list.filter((c:any)=> new Date(c.data).getTime() < Date.now())
+  const now = Date.now()
+  const isFutureAgendada = (consulta: Consulta) => {
+    if (consulta.status !== 'AGENDADA') return false
+    const parsed = new Date(consulta.data)
+    if (Number.isNaN(parsed.getTime())) return false
+    return parsed.getTime() >= now
+  }
+  const futuras = list.filter(isFutureAgendada)
+  const historico = list.filter(c => !isFutureAgendada(c))
+
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
-  return (<Card className="rounded-2xl">
-    <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Histórico de Consultas</CardTitle></CardHeader>
-    <CardContent className="p-0">
-      <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead></TableRow></TableHeader>
-      <TableBody>{passado.map((c:any)=>(<TableRow key={c.id}><TableCell>{c.id}</TableCell><TableCell>{c.animalId}</TableCell><TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell><TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell><TableCell>{c.observacoes||''}</TableCell></TableRow>))}</TableBody></Table>
-    </CardContent>
-  </Card>)
+  const renderRows = (items: Consulta[], prefix: 'future'|'past') => items.map((c)=>{
+    const parsed = new Date(c.data)
+    const dataFormatada = Number.isNaN(parsed.getTime()) ? '—' : br.format(parsed)
+    return (
+      <TableRow key={`${prefix}-${c.id}`}>
+        <TableCell>{c.id}</TableCell>
+        <TableCell>{c.animalId}</TableCell>
+        <TableCell>{c.tipo}</TableCell>
+        <TableCell>{dataFormatada}</TableCell>
+        <TableCell>
+          <span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span>
+        </TableCell>
+        <TableCell>{c.observacoes?.trim() || '—'}</TableCell>
+      </TableRow>
+    )
+  })
+  const hasAny = futuras.length + historico.length > 0
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Histórico de Consultas</CardTitle></CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Animal</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Data</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Obs.</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {futuras.length > 0 && (
+              <>
+                <TableRow>
+                  <TableCell colSpan={6} className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                    Próximas consultas
+                  </TableCell>
+                </TableRow>
+                {renderRows(futuras, 'future')}
+              </>
+            )}
+            {historico.length > 0 && (
+              <>
+                <TableRow>
+                  <TableCell colSpan={6} className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                    Consultas anteriores
+                  </TableCell>
+                </TableRow>
+                {renderRows(historico, 'past')}
+              </>
+            )}
+            {!hasAny && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-sm text-gray-500">
+                  Nenhuma consulta registrada até o momento.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
 }
 
 

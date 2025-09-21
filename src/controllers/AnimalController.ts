@@ -17,7 +17,6 @@ const parseIdade = (raw: unknown): ParsedIdade => {
   return { value: Math.floor(parsed) };
 };
 
-
 export class AnimalController {
   private parseIdade(raw: unknown): { value: number | null } | { error: string } {
     if (raw === undefined) {
@@ -36,7 +35,6 @@ export class AnimalController {
   async create(req: Request, res: Response) {
     const usuario: any = (req as any).usuario;
     const idadeParse = parseIdade(req.body.idade);
-
     if ('error' in idadeParse) {
       return res.status(400).json({ erro: idadeParse.error });
     }
@@ -78,12 +76,10 @@ export class AnimalController {
     if (usuario?.tipo !== 'admin' && a.clienteId !== Number(usuario.id)) {
       return res.status(403).json({ erro: 'Sem permissão para alterar este animal' });
     }
-
     const idadeProvided = Object.prototype.hasOwnProperty.call(req.body, 'idade');
     let idadeValor: number | null | undefined;
     if (idadeProvided) {
       const idadeParse = parseIdade(req.body.idade);
-
       if ('error' in idadeParse) {
         return res.status(400).json({ erro: idadeParse.error });
       }
