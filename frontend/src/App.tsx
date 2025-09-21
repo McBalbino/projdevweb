@@ -19,23 +19,9 @@ import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
 import type { Consulta } from '@/api/consultas'
 
-const formatDateInputValue = (value?: string) => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return parsed.toISOString().slice(0, 10)
-}
 
-const normalizeDateInputToISO = (value: string) => {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  const base = trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`
-  const parsed = new Date(base)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return parsed.toISOString()
-}
+const formatISODateForInput = (value?: string) => {
 
-const formatDateInputValue = (value?: string) => {
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
@@ -389,7 +375,9 @@ function AdminConsultasPage(){
         <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
         <Input
           type="date"
-          value={formatDateInputValue(editRow.data)}
+
+          value={formatISODateForInput(editRow.data)}
+
           onChange={e=>{
             const iso = normalizeDateInputToISO(e.target.value)
             setEditRow({ ...editRow, data: iso })
@@ -530,7 +518,6 @@ function ClienteHistoricoPage(){
   }
   const futuras = list.filter(isFutureAgendada)
   const historico = list.filter(c => !isFutureAgendada(c))
-
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
   const renderRows = (items: Consulta[], prefix: 'future'|'past') => items.map((c)=>{
     const parsed = new Date(c.data)
@@ -682,7 +669,6 @@ function MeusAnimaisPage(){
               <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-
               {list.map((a:any)=>{
                 const isEditingRow = editing?.id === a.id
                 return (
@@ -703,7 +689,6 @@ function MeusAnimaisPage(){
                   </TableRow>
                 )
               })}
-
             </TableBody>
           </Table>
         </CardContent>
