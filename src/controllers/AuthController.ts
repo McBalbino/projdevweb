@@ -18,7 +18,14 @@ export class AuthController {
 
     const tipo = (user instanceof Admin) ? 'admin' : 'cliente';
     const token = jwt.sign({ id: (user as any).id, email: (user as any).email, tipo }, secret, { expiresIn: '1h' });
-    return res.json({ token });
+    const data = user.toJSON() as any;
+    return res.json({
+      id: data.id,
+      nome: data.nome,
+      email: data.email,
+      tipo,
+      token,
+    });
   }
 
   async registrarAdmin(req: Request, res: Response) {
