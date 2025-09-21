@@ -18,6 +18,22 @@ import { Fornecedores, ProdutoFornecedor } from '@/api/fornecedores'
 import { Pedidos, StatusPedido } from '@/api/pedidos'
 import { Consultas } from '@/api/consultas'
 
+const formatDateInputValue = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
+
+const normalizeDateInputToISO = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const base = trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`
+  const parsed = new Date(base)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString()
+}
+
 function AppShell(){ const { user, logout } = useAuth(); return (
   <div className="flex items-center justify-between mb-6">
     <div>
@@ -322,8 +338,19 @@ function AdminConsultasPage(){
   const [list,setList]=useState<any[]>([])
   const [editRow,setEditRow]=useState<any|null>(null)
   React.useEffect(()=>{ Consultas.list().then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
-  const save = async()=>{ if(!editRow) return; await Consultas.update(editRow.id, editRow); toast.success('Consulta atualizada'); setEditRow(null); setList(await Consultas.list()) }
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+  const save = async()=>{
+    if(!editRow) return
+    const tipo = (editRow.tipo || '').trim()
+    if (!tipo || !editRow.data) {
+      toast.error('Preencha tipo e data')
+      return
+    }
+    await Consultas.update(editRow.id, { ...editRow, tipo })
+    toast.success('Consulta atualizada')
+    setEditRow(null)
+    setList(await Consultas.list())
+  }
   const remove = async(id:number)=>{ await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.list()) }
   const setStatus = async(id:number, status:'AGENDADA'|'CONCLUIDA'|'CANCELADA')=>{ await Consultas.update(id, { status }); toast.success('Status atualizado'); setList(await Consultas.list()) }
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
@@ -343,7 +370,14 @@ function AdminConsultasPage(){
       </TableRow>))}</TableBody></Table>
       {editRow && <div className="p-4 border-t grid md:grid-cols-5 gap-2">
         <Input value={editRow.tipo} onChange={e=>setEditRow({...editRow, tipo:e.target.value})} placeholder="Tipo"/>
-        <Input type="datetime-local" value={editRow.data.slice(0,16)} onChange={e=>setEditRow({...editRow, data:new Date(e.target.value).toISOString()})}/>
+        <Input
+          type="date"
+          value={formatDateInputValue(editRow.data)}
+          onChange={e=>{
+            const iso = normalizeDateInputToISO(e.target.value)
+            setEditRow({ ...editRow, data: iso })
+          }}
+        />
         <Input value={editRow.observacoes||''} onChange={e=>setEditRow({...editRow, observacoes:e.target.value})} placeholder="Observações"/>
         <Select value={editRow.status} onValueChange={(v:any)=>setEditRow({...editRow, status:v})}>
           <SelectTrigger><SelectValue placeholder="Status"/></SelectTrigger>
@@ -380,7 +414,9 @@ function ClienteConsultasPage(){
     }
     load()
   },[user])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+
   const create = async()=>{
     if(!user) return
     if (!form.animalId) {
@@ -393,17 +429,20 @@ function ClienteConsultasPage(){
       return
     }
     const tipo = form.tipo.trim()
-    if (!tipo || !form.data) {
+
+    const rawDate = form.data.trim()
+    if (!tipo || !rawDate) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
-    const quando = new Date(form.data)
-    if (Number.isNaN(quando.getTime())) {
-      toast.error('Informe uma data e horário válidos')
+    const isoDate = normalizeDateInputToISO(rawDate)
+    if (!isoDate) {
+      toast.error('Informe uma data válida')
       return
     }
     try{
-      await Consultas.create({ clienteId:user.id, animalId, tipo, data:quando.toISOString(), observacoes: form.observacoes?.trim() || undefined })
+      await Consultas.create({ clienteId:user.id, animalId, tipo, data: isoDate, observacoes: form.observacoes?.trim() || undefined })
+
       toast.success('Consulta agendada')
       setForm({animalId:'',tipo:'',data:'',observacoes:''})
       setList(await Consultas.listMine(user.id))
@@ -433,7 +472,9 @@ function ClienteConsultasPage(){
         </Select>
         {!myAnimals.length && <p className="text-xs text-gray-500">Cadastre um animal na aba "Meus Animais" para agendar uma consulta.</p>}
         <Input placeholder="Tipo (ex.: Banho, Tosa)" value={form.tipo} onChange={e=>setForm(prev=>({...prev, tipo:e.target.value}))}/>
-        <Input type="datetime-local" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+
+        <Input type="date" value={form.data} onChange={e=>setForm(prev=>({...prev, data:e.target.value}))}/>
+
         <Input placeholder="Observações" value={form.observacoes||''} onChange={e=>setForm(prev=>({...prev, observacoes:e.target.value}))}/>
         <Button className="w-full" onClick={create} disabled={!myAnimals.length}>Agendar</Button>
       </CardContent>
@@ -456,7 +497,7 @@ function ClienteHistoricoPage(){
   const { user } = useAuth()
   const [list,setList]=useState<any[]>([])
   React.useEffect(()=>{ if(!user) return; Consultas.listMine(user.id).then(setList).catch(()=>toast.error('Falha ao carregar histórico')) },[user])
-  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
   const passado = list.filter((c:any)=> new Date(c.data).getTime() < Date.now())
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
   return (<Card className="rounded-2xl">
