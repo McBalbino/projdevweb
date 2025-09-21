@@ -496,23 +496,28 @@ function MeusAnimaisPage(){
               <TableRow><TableHead>Nome</TableHead><TableHead>Espécie</TableHead><TableHead>Raça</TableHead><TableHead>Idade</TableHead><TableHead className="w-40">Ações</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((a:any)=>(
-                <TableRow key={a.id}>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.nome} onChange={e=>setEditing(prev=>prev?{...prev, nome:e.target.value}:prev)}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.especie} onChange={e=>setEditing(prev=>prev?{...prev, especie:e.target.value}:prev)}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
-                  <TableCell>{editing?.id===a.id ? <Input value={editing.raca} onChange={e=>setEditing(prev=>prev?{...prev, raca:e.target.value}:prev)}/> : <span className="capitalize">{a.raca}</span>}</TableCell>
-                  <TableCell>{editing?.id===a.id ? <Input type="number" min={0} value={editing.idade} onChange={e=>setEditing(prev=>prev?{...prev, idade:e.target.value}:prev)}/> : <span>{a.idade ?? '—'}</span>}</TableCell>
-                  <TableCell className="flex gap-2">
-                    {editing?.id===a.id ? (<>
-                      <Button size="sm" onClick={save}>Salvar</Button>
-                      <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
-                    </>) : (<>
-                      <Button size="sm" variant="secondary" onClick={()=>setEditing({ id:a.id, nome:a.nome, especie:a.especie, raca:a.raca, idade:a.idade!=null?String(a.idade):'' })}>Editar</Button>
-                      <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
-                    </>)}
-                  </TableCell>
-                </TableRow>
-              ))}
+
+              {list.map((a:any)=>{
+                const isEditingRow = editing?.id === a.id
+                return (
+                  <TableRow key={a.id}>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.nome} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, nome:e.target.value}:prev)}/> : <span className="font-medium">{a.nome}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.especie} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, especie:e.target.value}:prev)}/> : <span className="capitalize">{a.especie}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input value={editing.raca} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, raca:e.target.value}:prev)}/> : <span className="capitalize">{a.raca}</span>}</TableCell>
+                    <TableCell>{isEditingRow && editing ? <Input type="number" min={0} value={editing.idade} onChange={e=>setEditing(prev=>prev&&prev.id===a.id?{...prev, idade:e.target.value}:prev)}/> : <span>{a.idade ?? '—'}</span>}</TableCell>
+                    <TableCell className="flex gap-2">
+                      {isEditingRow ? (<>
+                        <Button size="sm" onClick={save}>Salvar</Button>
+                        <Button size="sm" variant="ghost" onClick={()=>setEditing(null)}>Cancelar</Button>
+                      </>) : (<>
+                        <Button size="sm" variant="secondary" onClick={()=>setEditing({ id:a.id, nome:a.nome, especie:a.especie, raca:a.raca, idade:a.idade!=null?String(a.idade):'' })}>Editar</Button>
+                        <Button size="sm" variant="destructive" onClick={()=>remove(a.id)}>Excluir</Button>
+                      </>)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+
             </TableBody>
           </Table>
         </CardContent>
