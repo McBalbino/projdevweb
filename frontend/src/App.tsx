@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { PawPrint, Users, Building2, Calendar, Search, LogOut, Shield } from 'lucide-react'
 import { Clients } from '@/api/clients'
+import type { Client } from '@/api/clients'
 import { Animais } from '@/api/animais'
 import type { Animal } from '@/api/animais'
 
@@ -163,11 +164,49 @@ function AuthGate({ children }:{children:React.ReactNode}){
 }
 
 function DashboardPage(){
+  const { user } = useAuth()
+  const isAdmin = user?.tipo === 'admin'
+
+  const sections: { title: string; description: string }[] = isAdmin
+    ? [
+        { title: 'Pedidos', description: 'Acompanhe solicitações de compra, atualize o status e registre recebimentos.' },
+        { title: 'Fornecedores', description: 'Cadastre novos parceiros, revise contatos e organize o catálogo de produtos.' },
+        { title: 'Animais', description: 'Visualize os pets cadastrados e confirme os vínculos com cada cliente.' },
+        { title: 'Clientes', description: 'Mantenha os dados dos clientes atualizados para facilitar os atendimentos.' },
+        { title: 'Consultas (agendadas)', description: 'Veja os agendamentos, confirme horários e acompanhe o andamento de cada consulta.' },
+      ]
+    : [
+        { title: 'Meus Animais', description: 'Cadastre, edite e acompanhe as informações dos seus pets.' },
+        { title: 'Consultas', description: 'Solicite novos agendamentos e acompanhe o andamento dos pedidos enviados.' },
+        { title: 'Histórico', description: 'Revise consultas finalizadas e mantenha um registro dos atendimentos anteriores.' },
+      ]
+
+  const intro = isAdmin
+    ? 'Gerencie as operações do petshop por aqui. Use as abas acima para acompanhar pedidos, fornecedores, animais, clientes e as consultas agendadas.'
+    : 'Bem-vindo(a) de volta! Use as abas acima para cuidar dos seus pets, solicitar consultas e consultar seus atendimentos anteriores.'
+
+  const tip = isAdmin
+    ? 'Dica: mantenha cadastros e status atualizados para que toda a equipe tenha uma visão clara das prioridades do dia.'
+    : 'Dica: revise os dados do pet antes de agendar uma nova consulta para que a equipe possa preparar o melhor atendimento.'
+
   return (<Card className="rounded-2xl">
     <CardHeader className="card-header-grad rounded-t-2xl">
       <CardTitle className="text-white">Bem-vindo(a) ao Petshop</CardTitle>
     </CardHeader>
-    <CardContent>Use as abas para navegar: Pedidos, Fornecedores, Animais {`&`} Clientes (admin).</CardContent>
+    <CardContent className="space-y-5">
+      <p className="text-gray-600 leading-relaxed">{intro}</p>
+      <div className="space-y-2">
+        <p className="font-medium text-foreground">Seções disponíveis</p>
+        <ul className="list-disc pl-5 space-y-2 text-sm text-gray-600">
+          {sections.map((section) => (
+            <li key={section.title}>
+              <span className="font-medium text-foreground">{section.title}:</span> {section.description}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="text-xs text-gray-500">{tip}</p>
+    </CardContent>
   </Card>)
 }
 
@@ -762,8 +801,23 @@ function PedidosPage(){
 
 function AdminConsultasPage(){
   const [list,setList]=useState<any[]>([])
+  const [animals,setAnimals]=useState<Animal[]>([])
+  const [clients,setClients]=useState<Client[]>([])
   const [editRow,setEditRow]=useState<any|null>(null)
-  React.useEffect(()=>{ Consultas.list().then(setList).catch(()=>toast.error('Falha ao carregar consultas')) },[])
+  React.useEffect(()=>{
+    const load = async()=>{
+      try{
+        const [consultas, animais, clientes] = await Promise.all([Consultas.list(), Animais.list(), Clients.list()])
+        setList(consultas)
+        setAnimals(animais)
+        setClients(clientes)
+      }catch(e){
+        console.error('Erro ao carregar consultas, animais ou clientes', e)
+        toast.error('Falha ao carregar consultas')
+      }
+    }
+    load()
+  },[])
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
   const save = async()=>{
     if(!editRow) return
@@ -780,11 +834,25 @@ function AdminConsultasPage(){
   const remove = async(id:number)=>{ await Consultas.remove(id); toast.success('Consulta excluída'); setList(await Consultas.list()) }
   const setStatus = async(id:number, status:'AGENDADA'|'CONCLUIDA'|'CANCELADA')=>{ await Consultas.update(id, { status }); toast.success('Status atualizado'); setList(await Consultas.list()) }
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
+  const animalNomePorId = React.useMemo(() => {
+    const map = new Map<number, string>()
+    animals.forEach((animal)=>{
+      map.set(animal.id, animal.nome)
+    })
+    return map
+  }, [animals])
+  const clienteNomePorId = React.useMemo(() => {
+    const map = new Map<number, string>()
+    clients.forEach((cliente)=>{
+      map.set(cliente.id, cliente.nome)
+    })
+    return map
+  }, [clients])
   return (<Card className="rounded-2xl"><CardHeader className="card-header-grad rounded-t-2xl"><CardTitle className="text-white">Consultas agendadas</CardTitle></CardHeader>
     <CardContent className="p-0">
       <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Cliente</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-64">Ações</TableHead></TableRow></TableHeader>
       <TableBody>{list.map((c:any)=>(<TableRow key={c.id}>
-        <TableCell>{c.id}</TableCell><TableCell>{c.clienteId}</TableCell><TableCell>{c.animalId}</TableCell>
+        <TableCell>{c.id}</TableCell><TableCell>{clienteNomePorId.get(c.clienteId) || `#${c.clienteId}`}</TableCell><TableCell>{animalNomePorId.get(c.animalId) || `#${c.animalId}`}</TableCell>
         <TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell>
         <TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell>
         <TableCell className="flex gap-2">
@@ -842,6 +910,13 @@ function ClienteConsultasPage(){
     load()
   },[user])
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
+  const animalNomePorId = React.useMemo(() => {
+    const map = new Map<number, string>()
+    myAnimals.forEach((animal)=>{
+      map.set(animal.id, animal.nome)
+    })
+    return map
+  }, [myAnimals])
   const create = async()=>{
     if(!user) return
     if (!form.animalId) {
@@ -905,7 +980,7 @@ function ClienteConsultasPage(){
       <CardContent className="p-0">
         <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Animal</TableHead><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="w-48">Ações</TableHead></TableRow></TableHeader>
         <TableBody>{list.map((c:any)=>(<TableRow key={c.id}>
-          <TableCell>{c.id}</TableCell><TableCell>{c.animalId}</TableCell><TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell>
+          <TableCell>{c.id}</TableCell><TableCell>{animalNomePorId.get(c.animalId) || `#${c.animalId}`}</TableCell><TableCell>{c.tipo}</TableCell><TableCell>{br.format(new Date(c.data))}</TableCell>
           <TableCell><span className={`px-2 py-1 rounded-full text-xs ${badge(c.status)}`}>{c.status}</span></TableCell>
           <TableCell className="flex gap-2"><Button variant="secondary" onClick={()=>add1h(c.id, c.data)}>+1h</Button><Button variant="destructive" onClick={()=>remove(c.id)}>Excluir</Button></TableCell>
         </TableRow>))}</TableBody></Table>
@@ -917,11 +992,23 @@ function ClienteConsultasPage(){
 function ClienteHistoricoPage(){
   const { user } = useAuth()
   const [list,setList]=useState<Consulta[]>([])
+  const [myAnimals,setMyAnimals]=useState<Animal[]>([])
   React.useEffect(()=>{
     if(!user) return
-    Consultas.listMine(user.id)
-      .then(setList)
-      .catch(()=>toast.error('Falha ao carregar histórico'))
+    const load = async()=>{
+      try{
+        const [animals, consultas] = await Promise.all([
+          Animais.listMine(user.id),
+          Consultas.listMine(user.id)
+        ])
+        setMyAnimals(animals)
+        setList(consultas)
+      }catch(e){
+        console.error('Erro ao carregar histórico de consultas', e)
+        toast.error('Falha ao carregar histórico')
+      }
+    }
+    load()
   },[user])
   const br = new Intl.DateTimeFormat('pt-BR', { dateStyle:'short' })
   const now = Date.now()
@@ -934,13 +1021,21 @@ function ClienteHistoricoPage(){
   const futuras = list.filter(isFutureAgendada)
   const historico = list.filter(c => !isFutureAgendada(c))
   const badge = (s:string)=> s==='CONCLUIDA' ? 'badge-primary' : s==='CANCELADA' ? 'bg-red-600 text-white' : 'badge-accent'
+  const animalNomePorId = React.useMemo(() => {
+    const map = new Map<number, string>()
+    myAnimals.forEach((animal)=>{
+      map.set(animal.id, animal.nome)
+    })
+    return map
+  }, [myAnimals])
   const renderRows = (items: Consulta[], prefix: 'future'|'past') => items.map((c)=>{
     const parsed = new Date(c.data)
     const dataFormatada = Number.isNaN(parsed.getTime()) ? '—' : br.format(parsed)
+    const animal = animalNomePorId.get(c.animalId) || `#${c.animalId}`
     return (
       <TableRow key={`${prefix}-${c.id}`}>
         <TableCell>{c.id}</TableCell>
-        <TableCell>{c.animalId}</TableCell>
+        <TableCell>{animal}</TableCell>
         <TableCell>{c.tipo}</TableCell>
         <TableCell>{dataFormatada}</TableCell>
         <TableCell>
